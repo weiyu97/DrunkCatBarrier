@@ -9,6 +9,12 @@ build/
 .gradle/
 local.properties
 
+# 旧版构建产物（仅本地参考，不入库）
+docs/醉猫结界_0.1.0/
+*.apk
+*.aab
+*.arsc
+
 # 日志与截图
 *.log
 docs/t_*.png
