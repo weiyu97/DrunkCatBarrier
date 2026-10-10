@@ -1,0 +1,110 @@
+package com.drunkcat.barrier.data
+
+import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+private val Context.dataStore by preferencesDataStore(name = "drunckat_prefs")
+
+/**
+ * 本地偏好存储。所有数据仅本地。
+ */
+class Prefs(private val context: Context) {
+
+    private object Keys {
+        val PIN = stringPreferencesKey("pin")
+        val LOCKED = stringPreferencesKey("locked_packages")
+        val WHITELIST = stringPreferencesKey("whitelist_packages")
+        val CONTRACT_MODE = stringPreferencesKey("contract_mode")
+        val PROTECTION_LEVEL = stringPreferencesKey("protection_level")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
+        val PROTECTION_ACTIVE = booleanPreferencesKey("protection_active")
+    }
+
+    // ---------- PIN ----------
+
+    suspend fun setPin(pin: String) {
+        context.dataStore.edit { it[Keys.PIN] = pin }
+    }
+
+    suspend fun getPin(): String? =
+        context.dataStore.data.first()[Keys.PIN]
+
+    fun pinFlow(): Flow<String?> =
+        context.dataStore.data.map { it[Keys.PIN] }
+
+    // ---------- 锁定包列表 ----------
+
+    suspend fun setLockedPackages(packages: List<String>) {
+        context.dataStore.edit { it[Keys.LOCKED] = packages.joinToString(",") }
+    }
+
+    suspend fun getLockedPackages(): List<String> =
+        (context.dataStore.data.first()[Keys.LOCKED] ?: "")
+            .split(",").filter { it.isNotBlank() }
+
+    fun lockedFlow(): Flow<List<String>> =
+        context.dataStore.data.map { prefs ->
+            (prefs[Keys.LOCKED] ?: "").split(",").filter { it.isNotBlank() }
+        }
+
+    // ---------- 白名单 ----------
+
+    suspend fun setWhitelistPackages(packages: List<String>) {
+        context.dataStore.edit { it[Keys.WHITELIST] = packages.joinToString(",") }
+    }
+
+    suspend fun getWhitelistPackages(): List<String> =
+        (context.dataStore.data.first()[Keys.WHITELIST] ?: "")
+            .split(",").filter { it.isNotBlank() }
+
+    fun whitelistFlow(): Flow<List<String>> =
+        context.dataStore.data.map { prefs ->
+            (prefs[Keys.WHITELIST] ?: "").split(",").filter { it.isNotBlank() }
+        }
+
+    // ---------- 契约模式 ----------
+
+    suspend fun setContractMode(mode: String) {
+        context.dataStore.edit { it[Keys.CONTRACT_MODE] = mode }
+    }
+
+    suspend fun getContractMode(): String =
+        context.dataStore.data.first()[Keys.CONTRACT_MODE] ?: ContractMode.QUICK.name
+
+    // ---------- 保护级别 ----------
+
+    suspend fun setProtectionLevel(level: String) {
+        context.dataStore.edit { it[Keys.PROTECTION_LEVEL] = level }
+    }
+
+    suspend fun getProtectionLevel(): String =
+        context.dataStore.data.first()[Keys.PROTECTION_LEVEL] ?: ProtectionLevel.L1.name
+
+    // ---------- 主题 ----------
+
+    suspend fun setThemeMode(mode: String) {
+        context.dataStore.edit { it[Keys.THEME_MODE] = mode }
+    }
+
+    suspend fun getThemeMode(): String =
+        context.dataStore.data.first()[Keys.THEME_MODE] ?: "GLASS"
+
+    // ---------- 保护开关（供无障碍服务读取） ----------
+
+    suspend fun setProtectionActive(active: Boolean) {
+        context.dataStore.edit { it[Keys.PROTECTION_ACTIVE] = active }
+    }
+
+    val protectionFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.PROTECTION_ACTIVE] ?: false }
+}
+
+enum class ContractMode { QUICK, FULL }
+
+enum class ProtectionLevel { L1, L2, L3 }

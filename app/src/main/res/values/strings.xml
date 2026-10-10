@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">醉猫结界</string>
+    <string name="accessibility_desc">醉猫结界需要通过无障碍服务，在打开被封印的应用时弹出清醒试炼。本服务不读取任何输入内容，不联网，仅用于检测前台应用。</string>
+</resources>

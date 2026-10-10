@@ -1,0 +1,30 @@
+# 签名文件（绝不提交）
+release.jks
+*.jks
+*.keystore
+keystore.properties
+
+# 构建产物
+build/
+.gradle/
+local.properties
+
+# 日志与截图
+*.log
+docs/t_*.png
+docs/tablet_*.png
+docs/screenshot_*.png
+docs/shot*.png
+docs/exec.png
+docs/*.mp4
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# 临时
+ui*.xml
+pkg.txt
+acts.txt
+wrapper.log
