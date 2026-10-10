@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drunkcat.barrier.report.InterceptLog
 import com.drunkcat.barrier.track.TrackStore
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -56,6 +58,9 @@ fun GlassReviewScreen(
     var entries by remember { mutableStateOf<List<InterceptLog.Entry>>(emptyList()) }
     var trackPoints by remember { mutableStateOf<List<com.drunkcat.barrier.track.TrackPoint>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    var toast by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         val now = System.currentTimeMillis()
@@ -211,6 +216,70 @@ fun GlassReviewScreen(
                                 modifier = Modifier.padding(top = 6.dp)
                             )
                         }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // ========== 数据管理 ==========
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    CardTitle("数据管理")
+
+                    Text(
+                        text = "轨迹与日志仅存于本机，不会自动删除。\n你可随时手动清理。",
+                        fontSize = 12.sp,
+                        lineHeight = 20.sp,
+                        color = Glass.OnSurfaceVariant,
+                        fontFamily = FontFamily.Serif,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    if (confirmDelete) {
+                        Text(
+                            text = "确认删除全部轨迹与日志？此操作不可恢复。",
+                            fontSize = 12.5.sp,
+                            color = Glass.Primary,
+                            fontFamily = FontFamily.Serif,
+                            modifier = Modifier.padding(bottom = 10.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(9.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                GlassSecondaryButton(text = "取消", onClick = { confirmDelete = false })
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                GlassPrimaryButton(
+                                    text = "确认删除",
+                                    onClick = {
+                                        confirmDelete = false
+                                        scope.launch {
+                                            trackStore.deleteAll()
+                                            logStore.deleteAll()
+                                            entries = emptyList()
+                                            trackPoints = emptyList()
+                                            toast = "已删除全部数据"
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        GlassGhostButton(
+                            text = "清除全部轨迹与日志",
+                            onClick = { confirmDelete = true }
+                        )
+                    }
+
+                    toast?.let {
+                        Text(
+                            text = it,
+                            fontSize = 12.sp,
+                            color = Color(0xFF6DFFB0),
+                            fontFamily = FontFamily.Serif,
+                            modifier = Modifier.padding(top = 10.dp)
+                        )
                     }
                 }
 
