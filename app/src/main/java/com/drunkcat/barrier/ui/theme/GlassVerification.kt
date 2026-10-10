@@ -131,8 +131,52 @@ fun GlassVerificationFlow(
                         }
                     )
                 }
+
+                // 紧急逃生：始终可拨打紧急电话，不受验证限制
+                Spacer(Modifier.height(14.dp))
+                EmergencyCallButton()
+                Spacer(Modifier.height(16.dp))
             }
         }
+    }
+}
+
+/**
+ * 紧急拨号按钮。
+ *
+ * 安全底线：验证界面永远提供紧急呼叫入口，
+ * 避免用户因无法通过验证而陷入危险。
+ */
+@Composable
+private fun EmergencyCallButton() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, Color(0x66FF4678), RoundedCornerShape(12.dp))
+            .clickable {
+                try {
+                    val intent = android.content.Intent(
+                        android.content.Intent.ACTION_DIAL
+                    ).apply {
+                        data = android.net.Uri.parse("tel:110")
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) { }
+            }
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "紧急呼叫",
+            color = Glass.Primary,
+            fontSize = 13.sp,
+            letterSpacing = 2.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = FontFamily.Serif
+        )
     }
 }
 
