@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="start_protection"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_start_short"
+        android:shortcutLongLabel="@string/shortcut_start_long">
+        <intent
+            android:action="com.drunkcat.barrier.START_PROTECTION"
+            android:targetPackage="com.drunkcat.barrier"
+            android:targetClass="com.drunkcat.barrier.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="checkup"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_checkup_short"
+        android:shortcutLongLabel="@string/shortcut_checkup_long">
+        <intent
+            android:action="com.drunkcat.barrier.OPEN_CHECKUP"
+            android:targetPackage="com.drunkcat.barrier"
+            android:targetClass="com.drunkcat.barrier.MainActivity" />
+    </shortcut>
+</shortcuts>

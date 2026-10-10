@@ -84,6 +84,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var manager: DeviceOwnerManager
     private lateinit var prefs: Prefs
 
+    // 快捷方式指定的初始页面（Compose 状态，可被 onNewIntent 更新）
+    private val initialScreenState =
+        androidx.compose.runtime.mutableStateOf<Screen?>(null)
+
     private val notifPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
@@ -114,6 +118,9 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        // 处理快捷方式意图
+        handleShortcut(intent)
+
         setContent {
             var themeMode by remember { mutableStateOf(ThemeMode.GLASS) }
             LaunchedEffect(Unit) {
@@ -128,6 +135,7 @@ class MainActivity : ComponentActivity() {
                     AppRoot(
                         manager = manager,
                         prefs = prefs,
+                        initialScreenState = initialScreenState,
                         themeMode = themeMode,
                         onToggleTheme = {
                             val next = if (themeMode == ThemeMode.GLASS)
@@ -141,6 +149,40 @@ class MainActivity : ComponentActivity() {
                         onToast = { toast(it) }
                     )
                 }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleShortcut(intent)
+    }
+
+    /** 处理长按图标快捷方式 */
+    private fun handleShortcut(intent: Intent?) {
+        when (intent?.action) {
+            "com.drunkcat.barrier.START_PROTECTION" -> {
+                lifecycleScope.launch {
+                    val p = Prefs(this@MainActivity)
+                    // 套用默认锁定清单（若尚未配置）
+                    if (p.getLockedPackages().isEmpty()) {
+                        val installed = packageManager
+                            .getInstalledApplications(0)
+                            .map { it.packageName }
+                        val defaults = com.drunkcat.barrier.data.DefaultLockList
+                            .pickDefault(installed)
+                        if (defaults.isNotEmpty()) p.setLockedPackages(defaults)
+                    }
+                    p.setProtectionActive(true)
+                    p.setProtectionUntil(
+                        com.drunkcat.barrier.data.ContractTime.nextMorning8()
+                    )
+                    LockService.start(this@MainActivity)
+                    toast("保护已开启")
+                }
+            }
+            "com.drunkcat.barrier.OPEN_CHECKUP" -> {
+                initialScreenState.value = Screen.CHECKUP
             }
         }
     }
@@ -202,6 +244,7 @@ private fun isAccessibilityEnabled(context: Context): Boolean {
 private fun AppRoot(
     manager: DeviceOwnerManager,
     prefs: Prefs,
+    initialScreenState: androidx.compose.runtime.MutableState<Screen?>,
     themeMode: ThemeMode,
     onToggleTheme: () -> Unit,
     onRequestAdmin: () -> Unit,
@@ -218,7 +261,15 @@ private fun AppRoot(
     // 体检页：Device Owner 说明对话框
     var showDeviceOwnerDialog by remember { mutableStateOf(false) }
 
-    var screen by remember { mutableStateOf(Screen.HOME) }
+    var screen by remember { mutableStateOf(initialScreenState.value ?: Screen.HOME) }
+
+    // 快捷方式切换页面时同步
+    LaunchedEffect(initialScreenState.value) {
+        initialScreenState.value?.let {
+            screen = it
+            initialScreenState.value = null
+        }
+    }
     var state by remember { mutableStateOf(manager.buildState()) }
     var apps by remember { mutableStateOf<List<InstalledApps.AppInfo>>(emptyList()) }
     var whitelist by remember { mutableStateOf<Set<String>>(emptySet()) }
