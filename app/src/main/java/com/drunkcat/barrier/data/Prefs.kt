@@ -29,6 +29,7 @@ class Prefs(private val context: Context) {
         val PROTECTION_UNTIL = longPreferencesKey("protection_until")
         val AUTO_PROTECT = booleanPreferencesKey("auto_protect")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+        val SKIP_AUTO_UNTIL = longPreferencesKey("skip_auto_until")
         val FAILURE_COUNT = intPreferencesKey("failure_count")
         val COOLDOWN_UNTIL = longPreferencesKey("cooldown_until")
     }
@@ -143,6 +144,22 @@ class Prefs(private val context: Context) {
     /** 是否已完成引导（默认 false，触发引导） */
     suspend fun isOnboardingDone(): Boolean =
         context.dataStore.data.first()[Keys.ONBOARDING_DONE] ?: false
+
+    // ---------- 今晚不喝（暂停自动检测） ----------
+
+    /** 暂停自动检测到指定时间戳（0 表示不暂停） */
+    suspend fun setSkipAutoUntil(until: Long) {
+        context.dataStore.edit { it[Keys.SKIP_AUTO_UNTIL] = until }
+    }
+
+    suspend fun getSkipAutoUntil(): Long =
+        context.dataStore.data.first()[Keys.SKIP_AUTO_UNTIL] ?: 0L
+
+    /** 当前是否处于暂停状态 */
+    suspend fun isAutoSkipped(): Boolean {
+        val until = getSkipAutoUntil()
+        return until > 0L && System.currentTimeMillis() < until
+    }
 
     // ---------- 失败计数与冷却 ----------
 

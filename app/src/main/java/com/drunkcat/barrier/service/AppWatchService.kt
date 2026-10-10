@@ -5,6 +5,7 @@ import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import com.drunkcat.barrier.data.Prefs
 import com.drunkcat.barrier.risk.RiskMonitor
+import com.drunkcat.barrier.risk.HeartRateMonitor
 import com.drunkcat.barrier.risk.ShakeDetector
 import com.drunkcat.barrier.ui.VerifyActivity
 import kotlinx.coroutines.CoroutineScope
@@ -30,12 +31,14 @@ class AppWatchService : AccessibilityService() {
     private lateinit var prefs: Prefs
 
     private var shakeDetector: ShakeDetector? = null
+    private var heartRateMonitor: HeartRateMonitor? = null
 
     private var lockedPackages: Set<String> = emptySet()
     private var whitelistPackages: Set<String> = emptySet()
     private var protectionActive = false
     private var autoProtectEnabled = true
     @Volatile private var cooldownUntilCache: Long = 0L
+    @Volatile private var skipAutoUntil: Long = 0L
 
     // 已验证通过、处于临时窗口期的应用
     @Volatile private var tempAllowedPackage: String? = null
@@ -66,15 +69,18 @@ class AppWatchService : AccessibilityService() {
         scope.launch {
             prefs.autoProtectFlow.collect { autoProtectEnabled = it }
         }
-        // 定期刷新冷却时间（冷却由 VerifyActivity 设置）
+        // 定期刷新冷却时间与暂停状态
         scope.launch {
             while (true) {
                 cooldownUntilCache = prefs.getCooldownUntil()
+                skipAutoUntil = prefs.getSkipAutoUntil()
                 kotlinx.coroutines.delay(5_000)
             }
         }
         // 启动步态检测
         shakeDetector = ShakeDetector(this).also { it.start() }
+        // 启动心率监测（若已授权蓝牙）
+        heartRateMonitor = HeartRateMonitor(this).also { it.start() }
         // 定期刷新时间信号并检查风险
         scope.launch {
             while (true) {
@@ -147,6 +153,8 @@ class AppWatchService : AccessibilityService() {
         if (WarningState.active) return
 
         val now = System.currentTimeMillis()
+        // 「今晚不喝」暂停期内不触发
+        if (skipAutoUntil > 0L && now < skipAutoUntil) return
         // 5 分钟内不重复触发
         if (now - lastAutoTriggerAt < 5 * 60 * 1000L) return
 
@@ -202,6 +210,7 @@ class AppWatchService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         shakeDetector?.stop()
+        heartRateMonitor?.stop()
         scope.cancel()
     }
 

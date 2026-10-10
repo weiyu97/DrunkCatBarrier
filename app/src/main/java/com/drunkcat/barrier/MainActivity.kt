@@ -94,6 +94,8 @@ class MainActivity : ComponentActivity() {
     private val locationPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         manager = DeviceOwnerManager(this)
@@ -258,6 +260,11 @@ private fun AppRoot(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { }
 
+    // 体检页：蓝牙权限请求器（心率手环）
+    val bluetoothPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { }
+
     // 体检页：Device Owner 说明对话框
     var showDeviceOwnerDialog by remember { mutableStateOf(false) }
 
@@ -278,6 +285,7 @@ private fun AppRoot(
     var contractMode by remember { mutableStateOf(ContractMode.QUICK) }
     var protectionActive by remember { mutableStateOf(false) }
     var autoProtectEnabled by remember { mutableStateOf(true) }
+    var autoSkipped by remember { mutableStateOf(false) }
     var onboardingDone by remember { mutableStateOf<Boolean?>(null) }
     var onboardingStep by remember { mutableIntStateOf(0) }
     var endHour by remember { mutableIntStateOf(com.drunkcat.barrier.data.ContractTime.DEFAULT_HOUR) }
@@ -300,6 +308,7 @@ private fun AppRoot(
         autoProtectEnabled = try {
             prefs.autoProtectFlow.first()
         } catch (e: Exception) { true }
+        autoSkipped = try { prefs.isAutoSkipped() } catch (e: Exception) { false }
         onboardingDone = try { prefs.isOnboardingDone() } catch (e: Exception) { true }
         // 首次启动时自动申请通知权限（用于预警）
         android.util.Log.d("DrunkCat", "onboardingDone=$onboardingDone")
@@ -433,6 +442,22 @@ private fun AppRoot(
                     onStopProtection = stopProtection,
                     protectionActive = protectionActive,
                     autoProtectEnabled = autoProtectEnabled,
+                    autoSkipped = autoSkipped,
+                    onToggleSkipTonight = {
+                        val next = !autoSkipped
+                        autoSkipped = next
+                        scope.launch {
+                            if (next) {
+                                // 暂停到明早 8:00
+                                prefs.setSkipAutoUntil(
+                                    com.drunkcat.barrier.data.ContractTime.nextMorning8()
+                                )
+                            } else {
+                                prefs.setSkipAutoUntil(0L)
+                            }
+                        }
+                        onToast(if (next) "今晚不再自动检测" else "已恢复自动检测")
+                    },
                     onToggleAutoProtect = {
                         val next = !autoProtectEnabled
                         autoProtectEnabled = next
@@ -746,6 +771,24 @@ private fun AppRoot(
                                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 )
                             } catch (e: Exception) { }
+                        }
+                    ),
+                    com.drunkcat.barrier.ui.theme.CheckupItem(
+                        title = "心率手环",
+                        desc = if (health.bluetoothOk)
+                            "已授权。请在手环上开启心率广播，App 会自动连接"
+                        else "未授权，可选功能（用于心率辅助判断）",
+                        ok = health.bluetoothOk,
+                        critical = false,
+                        action = {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                bluetoothPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.BLUETOOTH_SCAN,
+                                        Manifest.permission.BLUETOOTH_CONNECT
+                                    )
+                                )
+                            }
                         }
                     ),
                     com.drunkcat.barrier.ui.theme.CheckupItem(

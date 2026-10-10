@@ -17,7 +17,8 @@ object HealthCheck {
         val notificationOk: Boolean,
         val accessibilityOk: Boolean,
         val locationOk: Boolean,
-        val batteryOptimized: Boolean
+        val batteryOptimized: Boolean,
+        val bluetoothOk: Boolean = false
     ) {
         /** 是否存在会导致保护失效的严重问题 */
         val hasCriticalIssue: Boolean
@@ -33,8 +34,23 @@ object HealthCheck {
             notificationOk = checkNotification(context),
             accessibilityOk = checkAccessibility(context),
             locationOk = checkLocation(context),
-            batteryOptimized = checkBattery(context)
+            batteryOptimized = checkBattery(context),
+            bluetoothOk = checkBluetooth(context)
         )
+    }
+
+    /** 蓝牙权限（可选，用于心率手环） */
+    private fun checkBluetooth(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val scan = ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.BLUETOOTH_SCAN
+            ) == PackageManager.PERMISSION_GRANTED
+            val conn = ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.BLUETOOTH_CONNECT
+            ) == PackageManager.PERMISSION_GRANTED
+            return scan && conn
+        }
+        return true  // 旧版本无需运行时权限
     }
 
     /** 通知权限（API 33+ 需运行时授权） */

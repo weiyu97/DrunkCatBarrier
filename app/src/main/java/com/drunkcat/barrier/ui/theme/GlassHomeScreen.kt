@@ -55,7 +55,9 @@ fun GlassHomeScreen(
     onStopProtection: () -> Unit,
     protectionActive: Boolean,
     autoProtectEnabled: Boolean,
+    autoSkipped: Boolean,
     onToggleAutoProtect: () -> Unit,
+    onToggleSkipTonight: () -> Unit,
     accessibilityOn: Boolean,
     notificationOk: Boolean,
     onOpenAccessibility: () -> Unit,
@@ -193,6 +195,11 @@ fun GlassHomeScreen(
                     GlassSecondaryButton(
                         text = if (autoProtectEnabled) "自动检测：已开启" else "自动检测：已关闭",
                         onClick = onToggleAutoProtect
+                    )
+                    Spacer(Modifier.height(9.dp))
+                    GlassSecondaryButton(
+                        text = if (autoSkipped) "今晚不喝：已开启" else "今晚不喝：关闭",
+                        onClick = onToggleSkipTonight
                     )
                     Spacer(Modifier.height(9.dp))
                     GlassSecondaryButton(

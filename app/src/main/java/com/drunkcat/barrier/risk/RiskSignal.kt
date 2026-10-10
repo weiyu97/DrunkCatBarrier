@@ -22,7 +22,10 @@ enum class RiskSignal(val weight: Int, val label: String) {
     DEVICE_SHAKING(15, "手机持续晃动"),
 
     /** 长时间无操作后突然活跃（可能的断片恢复） */
-    SUDDEN_ACTIVITY(10, "突然活跃")
+    SUDDEN_ACTIVITY(10, "突然活跃"),
+
+    /** 心率异常（手环数据，弱信号，仅辅助） */
+    HEART_RATE_ANOMALY(12, "心率异常")
 }
 
 /**

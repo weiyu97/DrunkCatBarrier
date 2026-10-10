@@ -66,6 +66,15 @@ object RiskMonitor {
     }
 
     /**
+     * 记录一次心率异常信号。
+     */
+    fun onHeartRateAnomaly(detail: String, now: Long = System.currentTimeMillis()) {
+        synchronized(lock) {
+            addHit(RiskSignal.HEART_RATE_ANOMALY, now, detail)
+        }
+    }
+
+    /**
      * 获取当前风险分。
      */
     fun currentScore(now: Long = System.currentTimeMillis()): Int {
