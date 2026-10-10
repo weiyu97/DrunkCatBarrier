@@ -16,6 +16,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -216,6 +218,8 @@ private fun AppRoot(
     var contractMode by remember { mutableStateOf(ContractMode.QUICK) }
     var protectionActive by remember { mutableStateOf(false) }
     var autoProtectEnabled by remember { mutableStateOf(true) }
+    var onboardingDone by remember { mutableStateOf<Boolean?>(null) }
+    var onboardingStep by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         apps = InstalledApps.list(context)
@@ -233,9 +237,39 @@ private fun AppRoot(
         autoProtectEnabled = try {
             prefs.autoProtectFlow.first()
         } catch (e: Exception) { true }
+        onboardingDone = try { prefs.isOnboardingDone() } catch (e: Exception) { true }
+        // 首次启动时自动申请通知权限（用于预警）
+        android.util.Log.d("DrunkCat", "onboardingDone=$onboardingDone")
     }
 
     fun refresh() { state = manager.buildState() }
+
+    // 读取偏好期间显示空白，避免首帧闪主页
+    if (onboardingDone == null) {
+        Box(modifier = Modifier.fillMaxSize())
+        return
+    }
+
+    if (onboardingDone == false) {
+        com.drunkcat.barrier.ui.theme.GlassOnboarding(
+            step = onboardingStep,
+            accessibilityOn = isAccessibilityEnabled(context),
+            hasPin = pin != null,
+            onOpenAccessibility = { openAccessibilitySettings(context) },
+            onSetPin = { screen = Screen.PIN_SET },
+            onFinish = {
+                if (onboardingStep < 2) {
+                    onboardingStep++
+                } else {
+                    scope.launch {
+                        prefs.setOnboardingDone()
+                        onboardingDone = true
+                    }
+                }
+            }
+        )
+        return
+    }
 
     when (screen) {
         Screen.HOME -> {

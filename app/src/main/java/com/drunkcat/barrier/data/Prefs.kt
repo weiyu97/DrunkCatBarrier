@@ -27,6 +27,7 @@ class Prefs(private val context: Context) {
         val PROTECTION_ACTIVE = booleanPreferencesKey("protection_active")
         val PROTECTION_UNTIL = longPreferencesKey("protection_until")
         val AUTO_PROTECT = booleanPreferencesKey("auto_protect")
+        val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
     }
 
     // ---------- PIN ----------
@@ -129,6 +130,16 @@ class Prefs(private val context: Context) {
     /** 默认开启自动保护 */
     val autoProtectFlow: Flow<Boolean> =
         context.dataStore.data.map { it[Keys.AUTO_PROTECT] ?: true }
+
+    // ---------- 首次启动引导 ----------
+
+    suspend fun setOnboardingDone() {
+        context.dataStore.edit { it[Keys.ONBOARDING_DONE] = true }
+    }
+
+    /** 是否已完成引导（默认 false，触发引导） */
+    suspend fun isOnboardingDone(): Boolean =
+        context.dataStore.data.first()[Keys.ONBOARDING_DONE] ?: false
 }
 
 enum class ContractMode { QUICK, FULL }
