@@ -34,6 +34,7 @@ class AppWatchService : AccessibilityService() {
     private var lockedPackages: Set<String> = emptySet()
     private var whitelistPackages: Set<String> = emptySet()
     private var protectionActive = false
+    private var autoProtectEnabled = true
 
     // 已验证通过、处于临时窗口期的应用
     @Volatile private var tempAllowedPackage: String? = null
@@ -57,6 +58,9 @@ class AppWatchService : AccessibilityService() {
         }
         scope.launch {
             prefs.protectionFlow.collect { protectionActive = it }
+        }
+        scope.launch {
+            prefs.autoProtectFlow.collect { autoProtectEnabled = it }
         }
         // 启动步态检测
         shakeDetector = ShakeDetector(this).also { it.start() }
@@ -112,6 +116,7 @@ class AppWatchService : AccessibilityService() {
      * 30 秒无操作则自动开启保护。
      */
     private fun maybeAutoTrigger() {
+        if (!autoProtectEnabled) return
         if (protectionActive) return
         if (WarningState.active) return
 

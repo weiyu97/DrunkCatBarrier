@@ -54,6 +54,8 @@ fun GlassHomeScreen(
     onTestVerify: () -> Unit,
     onStopProtection: () -> Unit,
     protectionActive: Boolean,
+    autoProtectEnabled: Boolean,
+    onToggleAutoProtect: () -> Unit,
     accessibilityOn: Boolean,
     onOpenAccessibility: () -> Unit,
     onNavContract: () -> Unit,
@@ -178,6 +180,11 @@ fun GlassHomeScreen(
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     CardTitle("封印配置")
 
+                    GlassSecondaryButton(
+                        text = if (autoProtectEnabled) "自动检测：已开启" else "自动检测：已关闭",
+                        onClick = onToggleAutoProtect
+                    )
+                    Spacer(Modifier.height(9.dp))
                     GlassSecondaryButton(
                         text = "封印名单（$lockedCount）",
                         onClick = onPickApps

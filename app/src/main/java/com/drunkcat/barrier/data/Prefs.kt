@@ -26,6 +26,7 @@ class Prefs(private val context: Context) {
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val PROTECTION_ACTIVE = booleanPreferencesKey("protection_active")
         val PROTECTION_UNTIL = longPreferencesKey("protection_until")
+        val AUTO_PROTECT = booleanPreferencesKey("auto_protect")
     }
 
     // ---------- PIN ----------
@@ -118,6 +119,16 @@ class Prefs(private val context: Context) {
 
     val protectionUntilFlow: Flow<Long> =
         context.dataStore.data.map { it[Keys.PROTECTION_UNTIL] ?: 0L }
+
+    // ---------- 自动保护开关 ----------
+
+    suspend fun setAutoProtectEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.AUTO_PROTECT] = enabled }
+    }
+
+    /** 默认开启自动保护 */
+    val autoProtectFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.AUTO_PROTECT] ?: true }
 }
 
 enum class ContractMode { QUICK, FULL }

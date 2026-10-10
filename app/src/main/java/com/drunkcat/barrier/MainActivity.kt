@@ -215,6 +215,7 @@ private fun AppRoot(
     var pin by remember { mutableStateOf<String?>(null) }
     var contractMode by remember { mutableStateOf(ContractMode.QUICK) }
     var protectionActive by remember { mutableStateOf(false) }
+    var autoProtectEnabled by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         apps = InstalledApps.list(context)
@@ -229,6 +230,9 @@ private fun AppRoot(
         protectionActive = try {
             prefs.protectionFlow.first()
         } catch (e: Exception) { false }
+        autoProtectEnabled = try {
+            prefs.autoProtectFlow.first()
+        } catch (e: Exception) { true }
     }
 
     fun refresh() { state = manager.buildState() }
@@ -282,6 +286,13 @@ private fun AppRoot(
                     onTestVerify = { screen = Screen.VERIFICATION },
                     onStopProtection = stopProtection,
                     protectionActive = protectionActive,
+                    autoProtectEnabled = autoProtectEnabled,
+                    onToggleAutoProtect = {
+                        val next = !autoProtectEnabled
+                        autoProtectEnabled = next
+                        scope.launch { prefs.setAutoProtectEnabled(next) }
+                        onToast(if (next) "自动检测已开启" else "自动检测已关闭")
+                    },
                     accessibilityOn = isAccessibilityEnabled(context),
                     onOpenAccessibility = { openAccessibilitySettings(context) },
                     onNavContract = startContract,
