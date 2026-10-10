@@ -57,6 +57,15 @@ object RiskMonitor {
     }
 
     /**
+     * 记录一次「手机持续晃动」信号。
+     */
+    fun onDeviceShaking(now: Long = System.currentTimeMillis()) {
+        synchronized(lock) {
+            addHit(RiskSignal.DEVICE_SHAKING, now, "持续晃动")
+        }
+    }
+
+    /**
      * 获取当前风险分。
      */
     fun currentScore(now: Long = System.currentTimeMillis()): Int {

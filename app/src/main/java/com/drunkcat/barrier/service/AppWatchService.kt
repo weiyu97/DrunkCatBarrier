@@ -5,6 +5,7 @@ import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import com.drunkcat.barrier.data.Prefs
 import com.drunkcat.barrier.risk.RiskMonitor
+import com.drunkcat.barrier.risk.ShakeDetector
 import com.drunkcat.barrier.ui.VerifyActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,8 @@ class AppWatchService : AccessibilityService() {
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private lateinit var prefs: Prefs
+
+    private var shakeDetector: ShakeDetector? = null
 
     private var lockedPackages: Set<String> = emptySet()
     private var whitelistPackages: Set<String> = emptySet()
@@ -55,6 +58,8 @@ class AppWatchService : AccessibilityService() {
         scope.launch {
             prefs.protectionFlow.collect { protectionActive = it }
         }
+        // 启动步态检测
+        shakeDetector = ShakeDetector(this).also { it.start() }
         // 定期刷新时间信号并检查风险
         scope.launch {
             while (true) {
@@ -139,6 +144,7 @@ class AppWatchService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        shakeDetector?.stop()
         scope.cancel()
     }
 
