@@ -66,6 +66,15 @@ object RiskMonitor {
     }
 
     /**
+     * 记录一次打字异常信号。
+     */
+    fun onTypingAnomaly(detail: String, now: Long = System.currentTimeMillis()) {
+        synchronized(lock) {
+            addHit(RiskSignal.TYPING_ANOMALY, now, detail)
+        }
+    }
+
+    /**
      * 记录一次心率异常信号。
      */
     fun onHeartRateAnomaly(detail: String, now: Long = System.currentTimeMillis()) {

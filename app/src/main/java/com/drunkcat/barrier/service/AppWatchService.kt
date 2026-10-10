@@ -7,6 +7,7 @@ import com.drunkcat.barrier.data.Prefs
 import com.drunkcat.barrier.risk.RiskMonitor
 import com.drunkcat.barrier.risk.HeartRateMonitor
 import com.drunkcat.barrier.risk.ShakeDetector
+import com.drunkcat.barrier.risk.TypingAnalyzer
 import com.drunkcat.barrier.ui.VerifyActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,7 @@ class AppWatchService : AccessibilityService() {
 
     private var shakeDetector: ShakeDetector? = null
     private var heartRateMonitor: HeartRateMonitor? = null
+    private val typingAnalyzer = TypingAnalyzer()
 
     private var lockedPackages: Set<String> = emptySet()
     private var whitelistPackages: Set<String> = emptySet()
@@ -93,6 +95,28 @@ class AppWatchService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+
+        // ---- 打字行为分析（仅统计，不读内容）----
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
+            // removedCount / addedCount 是系统提供的计数，不涉及字符内容
+            val removed = event.removedCount
+            val added = event.addedCount
+            if (removed > 0) {
+                repeat(removed) { typingAnalyzer.onInput(true) }
+            }
+            if (added > 0) {
+                repeat(added) { typingAnalyzer.onInput(false) }
+            }
+            // 达到阈值则上报
+            if (typingAnalyzer.isAnomalous()) {
+                val ratio = typingAnalyzer.deletionRatio()
+                RiskMonitor.onTypingAnomaly(
+                    "删除率 ${(ratio * 100).toInt()}%"
+                )
+                typingAnalyzer.reset()  // 上报后清零，避免重复
+            }
+        }
+
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
         val pkg = event.packageName?.toString() ?: return

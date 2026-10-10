@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">醉猫结界</string>
-    <string name="accessibility_desc">醉猫结界需要通过无障碍服务，在打开被封印的应用时弹出清醒试炼。本服务不读取任何输入内容，不联网，仅用于检测前台应用。</string>
+    <string name="accessibility_desc">醉猫结界通过无障碍服务检测前台应用包名，用于在打开被封印的应用时弹出清醒试炼。同时统计输入事件的删除频率作为风险辅助判断——仅统计数量，不读取、不记录、不上传任何输入内容。本服务不联网。</string>
     <string name="shortcut_start_short">开启保护</string>
     <string name="shortcut_start_long">立即开启饮酒保护</string>
     <string name="shortcut_checkup_short">一键体检</string>
