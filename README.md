@@ -37,8 +37,9 @@
 | 深夜时段（22:00–06:00） | 30 |
 | 10 分钟内切换应用 ≥15 次 | 25 |
 | 打开通讯录/短信/社交/支付类应用 | 20 |
-| 加速度计持续晃动（待实现） | 15 |
-| 突然活跃（待实现） | 10 |
+| 加速度计持续晃动 | 15 |
+| 手环心率持续偏高（弱信号） | 12 |
+| 突然活跃 | 10 |
 
 总分 ≥ 60 → 进入 30 秒预警。
 
@@ -61,6 +62,7 @@
 - **最低版本**：Android 7.0（API 24）
 - **存储**：DataStore（偏好）+ JSON Lines（轨迹/日志）
 - **定位**：系统 LocationManager（不依赖 Google Play 服务）
+- **可穿戴**：标准 BLE 心率服务（0x180D），兼容小米/华为/Amazfit/佳明等
 
 ---
 
@@ -131,12 +133,12 @@ keytool -genkeypair -v -keystore release.jks -alias drunckat \
 \`\`\`
 com.drunkcat.barrier/
 ├── admin/        Device Owner 管理
-├── data/         偏好存储、应用查询
-├── risk/         风险评分引擎（纯逻辑，可单测）
-├── service/      无障碍监测、前台服务、预警
-├── track/        轨迹记录与逆地理编码
+├── data/         偏好存储、应用查询、白名单、默认锁定清单
+├── risk/         风险评分引擎（6 信号）+ 可穿戴抽象
+├── service/      无障碍监测、前台服务、预警、健康检查
+├── track/        轨迹记录、逆地理编码、投影
 ├── report/       拦截日志
-├── verify/       清醒验证（算术/成语/点阵）
+├── verify/       清醒验证（算术/成语/点阵）+ 难度分级
 └── ui/           界面（琉璃风 + 简约风双主题）
 \`\`\`
 
@@ -144,11 +146,17 @@ com.drunkcat.barrier/
 
 ## 测试
 
-21 个单元测试，覆盖：
+67 个单元测试，全部通过：
 
 | 测试类 | 用例 |
 |---|---|
+| ContractTimeTest | 11 |
 | RiskScorerTest | 10 |
+| HeartRateAnalyzerTest | 9 |
+| PermanentWhitelistTest | 8 |
+| DefaultLockListTest | 6 |
+| TrackProjectorTest | 6 |
+| VerifyDifficultyTest | 6 |
 | ArithmeticGeneratorTest | 5 |
 | IdiomGeneratorTest | 4 |
 | CooldownPolicyTest | 2 |
