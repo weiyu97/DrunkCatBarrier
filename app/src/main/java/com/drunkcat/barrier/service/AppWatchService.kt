@@ -135,13 +135,39 @@ class AppWatchService : AccessibilityService() {
             }
             WarningState.onTimeout = {
                 scope.launch {
+                    // 若用户从未配置锁定名单，套用默认清单，
+                    // 避免「保护中却拦不住任何东西」
+                    val current = prefs.getLockedPackages()
+                    if (current.isEmpty()) {
+                        val installed = queryInstalledPackages()
+                        val defaults = com.drunkcat.barrier.data.DefaultLockList
+                            .pickDefault(installed)
+                        if (defaults.isNotEmpty()) {
+                            prefs.setLockedPackages(defaults)
+                        }
+                    }
                     prefs.setProtectionActive(true)
+                    // 默认锁到次日 8:00
+                    prefs.setProtectionUntil(
+                        com.drunkcat.barrier.data.ContractTime.nextMorning8()
+                    )
                     AutoProtectionNotifier.notify(this@AppWatchService)
                 }
             }
 
             // 弹预警通知
             RiskWarningNotifier.notify(this@AppWatchService)
+        }
+    }
+
+    /**
+     * 查询所有已安装应用的包名（用于自动套用默认锁定清单）。
+     */
+    private fun queryInstalledPackages(): List<String> {
+        return try {
+            packageManager.getInstalledApplications(0).map { it.packageName }
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
