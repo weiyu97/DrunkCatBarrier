@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  网络安全配置。
+
+  原因：部分老设备（Android 7.x 及以下）的系统证书库不含
+  Let's Encrypt ISRG Root X1 等现代根证书，导致访问
+  Wikimedia / OSM 瓦片服务器时 SSLHandshakeException。
+
+  本配置显式信任这些根证书，且仅对地图瓦片域名生效，
+  不影响其他网络请求。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+
+    <!-- 地图瓦片域名：放宽证书信任（含用户安装证书） -->
+    <domain-config>
+        <domain includeSubdomains="true">wikimedia.org</domain>
+        <domain includeSubdomains="true">maps.wikimedia.org</domain>
+        <domain includeSubdomains="true">upload.wikimedia.org</domain>
+        <domain includeSubdomains="true">openstreetmap.org</domain>
+        <domain includeSubdomains="true">tile.openstreetmap.org</domain>
+        <domain includeSubdomains="true">opentopomap.org</domain>
+        <domain includeSubdomains="true">tile.opentopomap.org</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

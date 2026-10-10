@@ -30,6 +30,7 @@ docs/*.mp4
 .DS_Store
 
 # 临时
+test_track.jsonl
 ui*.xml
 pkg.txt
 acts.txt
