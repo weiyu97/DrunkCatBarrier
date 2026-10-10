@@ -75,6 +75,9 @@ class VerifyActivity : ComponentActivity() {
                     GlassVerificationFlow(
                         verifier = CognitiveVerifier(),
                         targetAppName = appLabel(targetPkg),
+                        difficulty = com.drunkcat.barrier.verify.VerifyDifficulty.fromRisk(
+                            com.drunkcat.barrier.risk.RiskMonitor.currentScore()
+                        ),
                         onResult = { passed, reason ->
                             if (passed) {
                                 kotlinx.coroutines.MainScope().launch {
@@ -88,7 +91,13 @@ class VerifyActivity : ComponentActivity() {
                                     )
                                     prefs.resetFailureState()
                                 }
-                                AppWatchService.grantTempAccess(targetPkg, 5 * 60 * 1000L)
+                                // 5 分钟该应用窗口 + 2 分钟全局放行
+                                // （避免短时间内反复验证多个被锁应用）
+                                AppWatchService.grantTempAccess(
+                                    targetPkg,
+                                    5 * 60 * 1000L,
+                                    2 * 60 * 1000L
+                                )
                                 Toast.makeText(this, "试炼通过", Toast.LENGTH_SHORT).show()
                                 finish()
                             } else {

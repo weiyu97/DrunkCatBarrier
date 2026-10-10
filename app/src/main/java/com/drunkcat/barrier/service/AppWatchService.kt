@@ -41,6 +41,9 @@ class AppWatchService : AccessibilityService() {
     @Volatile private var tempAllowedPackage: String? = null
     @Volatile private var tempAllowUntil: Long = 0L
 
+    // 全局放行：一次验证通过后，短时间内所有被锁应用免验证
+    @Volatile private var globalAllowUntil: Long = 0L
+
     // 防抖：同一应用短时间内不重复弹窗
     @Volatile private var lastBlockedPackage: String? = null
     @Volatile private var lastBlockedAt: Long = 0L
@@ -100,6 +103,8 @@ class AppWatchService : AccessibilityService() {
         if (pkg !in lockedPackages) return
 
         val now = System.currentTimeMillis()
+        // 全局放行期内直接通过
+        if (now < globalAllowUntil) return
         if (pkg == tempAllowedPackage && now < tempAllowUntil) return
         if (pkg == lastBlockedPackage && now - lastBlockedAt < 1500) return
 
@@ -201,10 +206,21 @@ class AppWatchService : AccessibilityService() {
     }
 
     companion object {
-        fun grantTempAccess(pkg: String, durationMs: Long) {
+        /**
+         * 验证通过后给予临时使用权限。
+         *
+         * @param pkg 目标应用
+         * @param durationMs 该应用的临时窗口
+         * @param globalMs 全局放行时长（期间所有被锁应用免验证）
+         */
+        fun grantTempAccess(pkg: String, durationMs: Long, globalMs: Long = 0L) {
             instance?.let {
+                val now = System.currentTimeMillis()
                 it.tempAllowedPackage = pkg
-                it.tempAllowUntil = System.currentTimeMillis() + durationMs
+                it.tempAllowUntil = now + durationMs
+                if (globalMs > 0L) {
+                    it.globalAllowUntil = now + globalMs
+                }
             }
         }
 

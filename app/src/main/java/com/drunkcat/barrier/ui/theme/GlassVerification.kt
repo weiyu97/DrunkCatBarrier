@@ -49,12 +49,16 @@ import kotlin.random.Random
 fun GlassVerificationFlow(
     verifier: CognitiveVerifier,
     targetAppName: String = "",
+    difficulty: com.drunkcat.barrier.verify.VerifyDifficulty =
+        com.drunkcat.barrier.verify.VerifyDifficulty.NORMAL,
     onResult: (passed: Boolean, reason: String) -> Unit
 ) {
-    // 随机抽 2 种题型（1=算术 2=成语 3=点阵）
-    val kinds = remember {
-        listOf(1, 2, 3).shuffled(Random(System.currentTimeMillis())).take(2)
+    // 按难度抽题型（1=算术 2=成语 3=点阵）
+    val kinds = remember(difficulty) {
+        listOf(1, 2, 3).shuffled(Random(System.currentTimeMillis()))
+            .take(difficulty.typeCount)
     }
+    val totalStages = kinds.size
     var stage by remember { mutableIntStateOf(0) }
 
     Box(
@@ -67,7 +71,7 @@ fun GlassVerificationFlow(
             )
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            GlassHeader(statusText = "邪眼试炼 · ${stage + 1} / 2")
+            GlassHeader(statusText = "邪眼试炼 · ${stage + 1} / $totalStages · ${difficulty.label}")
 
             Column(
                 modifier = Modifier
@@ -93,7 +97,7 @@ fun GlassVerificationFlow(
                             )
                         }
                         Text(
-                            text = "通过下方两项试炼即可临时使用 5 分钟。",
+                            text = "通过下方 $totalStages 项试炼即可临时使用 5 分钟。",
                             fontSize = 11.5.sp,
                             color = Glass.OnSurfaceVariant,
                             fontFamily = FontFamily.Serif,
@@ -104,28 +108,32 @@ fun GlassVerificationFlow(
 
                 when (kinds.getOrNull(stage)) {
                     1 -> GlassArithmetic(
-                        challenge = remember { verifier.newArithmeticChallenge() },
+                        challenge = remember(stage) {
+                            verifier.newArithmeticChallenge(difficulty.problemCount)
+                        },
                         onFinished = { passed, reason ->
                             if (passed) {
-                                if (stage == 0) stage = 1
+                                if (stage + 1 < totalStages) stage++
                                 else onResult(true, "")
                             } else onResult(false, reason)
                         }
                     )
                     2 -> GlassIdiom(
-                        challenge = remember { verifier.newIdiomChallenge() },
+                        challenge = remember(stage) {
+                            verifier.newIdiomChallenge(difficulty.problemCount)
+                        },
                         onFinished = { passed, reason ->
                             if (passed) {
-                                if (stage == 0) stage = 1
+                                if (stage + 1 < totalStages) stage++
                                 else onResult(true, "")
                             } else onResult(false, reason)
                         }
                     )
                     else -> GlassDotMemory(
-                        challenge = remember { verifier.newDotMemoryChallenge() },
+                        challenge = remember(stage) { verifier.newDotMemoryChallenge() },
                         onFinished = { passed ->
                             if (passed) {
-                                if (stage == 0) stage = 1
+                                if (stage + 1 < totalStages) stage++
                                 else onResult(true, "")
                             } else onResult(false, "点阵记忆未通过")
                         }
