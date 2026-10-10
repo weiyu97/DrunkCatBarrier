@@ -35,6 +35,7 @@ class AppWatchService : AccessibilityService() {
     private var whitelistPackages: Set<String> = emptySet()
     private var protectionActive = false
     private var autoProtectEnabled = true
+    @Volatile private var cooldownUntilCache: Long = 0L
 
     // 已验证通过、处于临时窗口期的应用
     @Volatile private var tempAllowedPackage: String? = null
@@ -61,6 +62,13 @@ class AppWatchService : AccessibilityService() {
         }
         scope.launch {
             prefs.autoProtectFlow.collect { autoProtectEnabled = it }
+        }
+        // 定期刷新冷却时间（冷却由 VerifyActivity 设置）
+        scope.launch {
+            while (true) {
+                cooldownUntilCache = prefs.getCooldownUntil()
+                kotlinx.coroutines.delay(5_000)
+            }
         }
         // 启动步态检测
         shakeDetector = ShakeDetector(this).also { it.start() }
@@ -94,6 +102,19 @@ class AppWatchService : AccessibilityService() {
         val now = System.currentTimeMillis()
         if (pkg == tempAllowedPackage && now < tempAllowUntil) return
         if (pkg == lastBlockedPackage && now - lastBlockedAt < 1500) return
+
+        // 冷却期内直接拦截，不弹验证页
+        val cooldownUntil = cooldownUntilCache
+        if (now < cooldownUntil) {
+            // 弹回桌面
+            val home = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(home)
+            return
+        }
+
         lastBlockedPackage = pkg
         lastBlockedAt = now
 

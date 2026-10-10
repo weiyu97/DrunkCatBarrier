@@ -5,19 +5,38 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.drunkcat.barrier.data.Prefs
 import com.drunkcat.barrier.report.InterceptLog
 import com.drunkcat.barrier.service.AppWatchService
+import com.drunkcat.barrier.ui.theme.CardTitle
 import com.drunkcat.barrier.ui.theme.DrunkCatTheme
+import com.drunkcat.barrier.ui.theme.Glass
+import com.drunkcat.barrier.ui.theme.GlassCard
+import com.drunkcat.barrier.ui.theme.GlassPrimaryButton
 import com.drunkcat.barrier.ui.theme.GlassVerificationFlow
 import com.drunkcat.barrier.ui.theme.ThemeMode
 import com.drunkcat.barrier.verify.CognitiveVerifier
@@ -57,33 +76,64 @@ class VerifyActivity : ComponentActivity() {
                         verifier = CognitiveVerifier(),
                         targetAppName = appLabel(targetPkg),
                         onResult = { passed, reason ->
-                            // 记录拦截日志
-                            kotlinx.coroutines.MainScope().launch {
-                                log.append(
-                                    InterceptLog.Entry(
-                                        timestamp = System.currentTimeMillis(),
-                                        packageName = targetPkg,
-                                        passed = passed,
-                                        reason = reason
-                                    )
-                                )
-                            }
                             if (passed) {
-                                // 给予 5 分钟临时使用窗口
+                                kotlinx.coroutines.MainScope().launch {
+                                    log.append(
+                                        InterceptLog.Entry(
+                                            timestamp = System.currentTimeMillis(),
+                                            packageName = targetPkg,
+                                            passed = true,
+                                            reason = ""
+                                        )
+                                    )
+                                    prefs.resetFailureState()
+                                }
                                 AppWatchService.grantTempAccess(targetPkg, 5 * 60 * 1000L)
                                 Toast.makeText(this, "试炼通过", Toast.LENGTH_SHORT).show()
                                 finish()
                             } else {
-                                Toast.makeText(this, "试炼失败：$reason", Toast.LENGTH_LONG).show()
-                                // 失败后关闭被锁 App（回到桌面）
-                                val home = android.content.Intent(
-                                    android.content.Intent.ACTION_MAIN
-                                ).apply {
-                                    addCategory(android.content.Intent.CATEGORY_HOME)
-                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                // 记录失败 + 递增计数 + 设置冷却
+                                kotlinx.coroutines.MainScope().launch {
+                                    log.append(
+                                        InterceptLog.Entry(
+                                            timestamp = System.currentTimeMillis(),
+                                            packageName = targetPkg,
+                                            passed = false,
+                                            reason = reason
+                                        )
+                                    )
+                                    val count = prefs.getFailureCount() + 1
+                                    prefs.setFailureCount(count)
+                                    val cooldown = com.drunkcat.barrier.verify.CooldownPolicy
+                                        .cooldownFor(count)
+                                    if (cooldown > 0) {
+                                        prefs.setCooldownUntil(
+                                            System.currentTimeMillis() + cooldown
+                                        )
+                                    }
+                                    // 切换到失败反馈页
+                                    setContent {
+                                        DrunkCatTheme(mode = ThemeMode.GLASS) {
+                                            Surface(modifier = Modifier.fillMaxSize()) {
+                                                com.drunkcat.barrier.ui.theme.GlassFailureScreen(
+                                                    reason = reason,
+                                                    failureCount = count,
+                                                    cooldownMs = cooldown,
+                                                    onDismiss = {
+                                                        val home = android.content.Intent(
+                                                            android.content.Intent.ACTION_MAIN
+                                                        ).apply {
+                                                            addCategory(android.content.Intent.CATEGORY_HOME)
+                                                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                        }
+                                                        startActivity(home)
+                                                        finish()
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
-                                startActivity(home)
-                                finish()
                             }
                         }
                     )

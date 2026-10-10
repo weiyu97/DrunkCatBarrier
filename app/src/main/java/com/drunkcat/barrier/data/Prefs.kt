@@ -3,6 +3,7 @@ package com.drunkcat.barrier.data
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -28,6 +29,8 @@ class Prefs(private val context: Context) {
         val PROTECTION_UNTIL = longPreferencesKey("protection_until")
         val AUTO_PROTECT = booleanPreferencesKey("auto_protect")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+        val FAILURE_COUNT = intPreferencesKey("failure_count")
+        val COOLDOWN_UNTIL = longPreferencesKey("cooldown_until")
     }
 
     // ---------- PIN ----------
@@ -140,6 +143,30 @@ class Prefs(private val context: Context) {
     /** 是否已完成引导（默认 false，触发引导） */
     suspend fun isOnboardingDone(): Boolean =
         context.dataStore.data.first()[Keys.ONBOARDING_DONE] ?: false
+
+    // ---------- 失败计数与冷却 ----------
+
+    suspend fun getFailureCount(): Int =
+        context.dataStore.data.first()[Keys.FAILURE_COUNT] ?: 0
+
+    suspend fun setFailureCount(n: Int) {
+        context.dataStore.edit { it[Keys.FAILURE_COUNT] = n }
+    }
+
+    suspend fun getCooldownUntil(): Long =
+        context.dataStore.data.first()[Keys.COOLDOWN_UNTIL] ?: 0L
+
+    suspend fun setCooldownUntil(ts: Long) {
+        context.dataStore.edit { it[Keys.COOLDOWN_UNTIL] = ts }
+    }
+
+    /** 验证通过后清零 */
+    suspend fun resetFailureState() {
+        context.dataStore.edit {
+            it[Keys.FAILURE_COUNT] = 0
+            it[Keys.COOLDOWN_UNTIL] = 0L
+        }
+    }
 }
 
 enum class ContractMode { QUICK, FULL }
