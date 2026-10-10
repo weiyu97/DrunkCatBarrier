@@ -55,6 +55,7 @@ class VerifyActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     GlassVerificationFlow(
                         verifier = CognitiveVerifier(),
+                        targetAppName = appLabel(targetPkg),
                         onResult = { passed, reason ->
                             // 记录拦截日志
                             kotlinx.coroutines.MainScope().launch {
@@ -88,6 +89,16 @@ class VerifyActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    /** 取应用显示名 */
+    private fun appLabel(pkg: String): String {
+        return try {
+            val pm = packageManager
+            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        } catch (e: Exception) {
+            pkg.split(".").lastOrNull() ?: pkg
         }
     }
 

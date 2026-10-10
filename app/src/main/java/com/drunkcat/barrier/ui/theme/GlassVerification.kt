@@ -48,6 +48,7 @@ import kotlin.random.Random
 @Composable
 fun GlassVerificationFlow(
     verifier: CognitiveVerifier,
+    targetAppName: String = "",
     onResult: (passed: Boolean, reason: String) -> Unit
 ) {
     // 随机抽 2 种题型（1=算术 2=成语 3=点阵）
@@ -73,6 +74,34 @@ fun GlassVerificationFlow(
                     .weight(1f)
                     .padding(horizontal = 13.dp)
             ) {
+                // 说明为什么被锁——避免用户困惑
+                if (targetAppName.isNotEmpty()) {
+                    GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                        androidx.compose.foundation.layout.Row(
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        ) {
+                            UiIcon(
+                                type = UiIconType.SHIELD,
+                                size = 15.dp,
+                                tint = Glass.Primary
+                            )
+                            Text(
+                                text = "  「$targetAppName」已被结界封印",
+                                fontSize = 12.5.sp,
+                                color = Glass.OnBg,
+                                fontFamily = FontFamily.Serif
+                            )
+                        }
+                        Text(
+                            text = "通过下方两项试炼即可临时使用 5 分钟。",
+                            fontSize = 11.5.sp,
+                            color = Glass.OnSurfaceVariant,
+                            fontFamily = FontFamily.Serif,
+                            modifier = Modifier.padding(top = 6.dp, start = 20.dp)
+                        )
+                    }
+                }
+
                 when (kinds.getOrNull(stage)) {
                     1 -> GlassArithmetic(
                         challenge = remember { verifier.newArithmeticChallenge() },
