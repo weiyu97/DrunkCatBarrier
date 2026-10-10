@@ -57,6 +57,7 @@ fun GlassHomeScreen(
     autoProtectEnabled: Boolean,
     onToggleAutoProtect: () -> Unit,
     accessibilityOn: Boolean,
+    notificationOk: Boolean,
     onOpenAccessibility: () -> Unit,
     onNavContract: () -> Unit,
     onNavTrial: () -> Unit,
@@ -153,6 +154,26 @@ fun GlassHomeScreen(
                         ok = true,
                         icon = UiIconType.BELL
                     )
+
+                    // 健康问题提示
+                    if (!notificationOk) {
+                        Row(
+                            modifier = Modifier.padding(top = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            UiIcon(
+                                type = UiIconType.WARNING,
+                                size = 14.dp,
+                                tint = Glass.Tertiary
+                            )
+                            Text(
+                                text = " 通知权限未开启，预警将无法提醒你。",
+                                fontSize = 11.5.sp,
+                                color = Glass.Tertiary,
+                                fontFamily = FontFamily.Serif
+                            )
+                        }
+                    }
 
                     if (!state.isDeviceOwner || !hasPin) {
                         Row(

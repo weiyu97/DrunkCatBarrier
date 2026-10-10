@@ -380,6 +380,8 @@ private fun AppRoot(
                         onToast(if (next) "自动检测已开启" else "自动检测已关闭")
                     },
                     accessibilityOn = isAccessibilityEnabled(context),
+                    notificationOk = com.drunkcat.barrier.service.HealthCheck
+                        .check(context).notificationOk,
                     onOpenAccessibility = { openAccessibilitySettings(context) },
                     onNavContract = startContract,
                     onNavTrial = { screen = Screen.VERIFICATION },

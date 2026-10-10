@@ -56,6 +56,9 @@ class WarningActivity : ComponentActivity() {
             WarningState.start()
         }
 
+        // 震动提醒，确保用户感知
+        vibrate()
+
         setContent {
             DrunkCatTheme(mode = ThemeMode.GLASS) {
                 WarningScreen(
@@ -70,6 +73,25 @@ class WarningActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    /** 震动提醒，确保用户感知预警 */
+    private fun vibrate() {
+        try {
+            val vb = getSystemService(android.content.Context.VIBRATOR_SERVICE)
+                as? android.os.Vibrator ?: return
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                vb.vibrate(
+                    android.os.VibrationEffect.createWaveform(
+                        longArrayOf(0, 400, 200, 400),
+                        -1
+                    )
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                vb.vibrate(longArrayOf(0, 400, 200, 400), -1)
+            }
+        } catch (e: Exception) { }
     }
 }
 

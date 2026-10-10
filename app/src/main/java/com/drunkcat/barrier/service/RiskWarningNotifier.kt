@@ -5,6 +5,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.drunkcat.barrier.R
@@ -31,6 +33,15 @@ object RiskWarningNotifier {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "检测到醉酒风险时的预警提醒"
+                // 强提醒：震动 + 提示音，确保用户能感知
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 500, 300, 500, 300, 500)
+                setSound(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .build()
+                )
             }
             nm.createNotificationChannel(ch)
         }
@@ -49,6 +60,9 @@ object RiskWarningNotifier {
             .setContentText("30 秒后自动开启保护。如果你还清醒，点击取消。")
             .setSmallIcon(R.drawable.ic_notification)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVibrate(longArrayOf(0, 500, 300, 500, 300, 500))
+            .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
             .setAutoCancel(true)
             .setContentIntent(pi)
             .build()
