@@ -272,9 +272,12 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 
 \`\`\`
 gradle :app:assembleDebug      # 构建 debug
-gradle :app:testDebugUnitTest  # 运行单测
+gradle :app:assembleRelease    # 构建 release（需 release.jks）
+gradle :app:testDebugUnitTest  # 运行单测（52 个）
 adb install -r app-debug.apk   # 安装
 \`\`\`
+
+Release APK 约 8.45 MB，已启用 R8 混淆与资源压缩。
 
 ### 12.3 Device Owner 激活
 
