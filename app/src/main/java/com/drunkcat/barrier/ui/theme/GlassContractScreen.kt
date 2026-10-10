@@ -41,15 +41,23 @@ import com.drunkcat.barrier.data.ContractMode
  */
 @Composable
 fun GlassContractScreen(
-    endTimeLabel: String,
     initialMode: ContractMode,
-    onConfirm: (mode: ContractMode) -> Unit,
+    initialEndHour: Int = com.drunkcat.barrier.data.ContractTime.DEFAULT_HOUR,
+    onConfirm: (mode: ContractMode, endHour: Int) -> Unit,
     onCancel: () -> Unit
 ) {
     var mode by remember { mutableStateOf(initialMode) }
     var checked by remember { mutableStateOf(false) }
     var text by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var endHour by remember { mutableStateOf(initialEndHour) }
+
+    // 根据选择的小时实时计算文案
+    val endTimeLabel = remember(endHour) {
+        com.drunkcat.barrier.data.ContractTime.label(
+            com.drunkcat.barrier.data.ContractTime.nextAt(endHour)
+        )
+    }
 
     val fullText = "我确认自己现在清醒，并自愿锁定所选 App 直到 $endTimeLabel。我理解在此期间无法随意使用这些 App。"
 
@@ -92,6 +100,56 @@ fun GlassContractScreen(
 
                     Spacer(Modifier.height(11.dp))
 
+                    // 结束时间选择
+                    Text(
+                        text = "锁定至",
+                        fontSize = 13.sp,
+                        color = Glass.Tertiary,
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(7.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        com.drunkcat.barrier.data.ContractTime.HOUR_OPTIONS.forEach { h ->
+                            val active = h == endHour
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        if (active) Color(0x33FF3264) else Color(0x0AFFFFFF)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (active) Color(0x8CFF4678) else Color(0x38AA82FF),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { endHour = h }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${h}:00",
+                                    fontSize = 12.sp,
+                                    color = if (active) Glass.Primary else Glass.OnBg,
+                                    fontFamily = FontFamily.Serif
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "将于 $endTimeLabel 自动解除",
+                        fontSize = 11.sp,
+                        color = Glass.OnSurfaceVariant,
+                        fontFamily = FontFamily.Serif
+                    )
+
+                    Spacer(Modifier.height(11.dp))
+
                     // 誓约输入区
                     Box(
                         modifier = Modifier
@@ -105,7 +163,7 @@ fun GlassContractScreen(
                         if (text.isEmpty()) {
                             Text(
                                 text = if (mode == ContractMode.QUICK)
-                                    "输入 OK"
+                                    "输入「我确认」三个字……"
                                 else
                                     "逐字写下誓约……",
                                 fontSize = 12.sp,
@@ -167,11 +225,15 @@ fun GlassContractScreen(
                             GlassPrimaryButton(
                                 text = "缔结契约",
                                 onClick = {
-                                    val ok = checked
-                                    if (ok) {
-                                        onConfirm(mode)
+                                    val ok = if (mode == ContractMode.QUICK) {
+                                        checked && text.trim() == "我确认"
                                     } else {
-                                        error = "誓约文本不匹配"
+                                        checked && text.trim() == fullText
+                                    }
+                                    if (ok) {
+                                        onConfirm(mode, endHour)
+                                    } else {
+                                        error = if (!checked) "请先勾选确认" else "誓约文本不匹配"
                                     }
                                 }
                             )

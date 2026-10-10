@@ -220,6 +220,7 @@ private fun AppRoot(
     var autoProtectEnabled by remember { mutableStateOf(true) }
     var onboardingDone by remember { mutableStateOf<Boolean?>(null) }
     var onboardingStep by remember { mutableIntStateOf(0) }
+    var endHour by remember { mutableIntStateOf(com.drunkcat.barrier.data.ContractTime.DEFAULT_HOUR) }
 
     LaunchedEffect(Unit) {
         apps = InstalledApps.list(context)
@@ -479,18 +480,19 @@ private fun AppRoot(
         Screen.CONTRACT -> {
             if (themeMode == ThemeMode.GLASS) {
                 GlassContractScreen(
-                    endTimeLabel = "明早 8:00",
                     initialMode = contractMode,
-                    onConfirm = { chosenMode ->
+                    initialEndHour = endHour,
+                    onConfirm = { chosenMode, chosenHour ->
                         scope.launch {
                             contractMode = chosenMode
+                            endHour = chosenHour
                             prefs.setContractMode(chosenMode.name)
                             // 开启保护开关，AppWatchService 据此拦截
                             prefs.setProtectionActive(true)
                             protectionActive = true
-                            // 设置到期时间：下一个早上 8:00
+                            // 设置到期时间
                             prefs.setProtectionUntil(
-                                com.drunkcat.barrier.data.ContractTime.nextMorning8()
+                                com.drunkcat.barrier.data.ContractTime.nextAt(chosenHour)
                             )
                             // Device Owner 路径：
                             // 1. 设置 LockTask 允许名单（本应用 + 永久白名单 + 用户白名单）
@@ -511,10 +513,17 @@ private fun AppRoot(
             } else {
                 ContractScreen(
                     mode = contractMode,
-                    endTimeLabel = "明早 8:00",
+                    endTimeLabel = com.drunkcat.barrier.data.ContractTime.label(
+                        com.drunkcat.barrier.data.ContractTime.nextAt(endHour)
+                    ),
                     onConfirm = {
                         scope.launch {
                             prefs.setContractMode(contractMode.name)
+                            prefs.setProtectionActive(true)
+                            protectionActive = true
+                            prefs.setProtectionUntil(
+                                com.drunkcat.barrier.data.ContractTime.nextAt(endHour)
+                            )
                             if (state.isDeviceOwner) {
                                 val allowed = buildAllowedPackages(context, whitelist)
                                 manager.setAllowedPackages(allowed)
