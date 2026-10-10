@@ -171,6 +171,11 @@ fun GlassReviewScreen(
                             fontFamily = FontFamily.Serif
                         )
                     } else {
+                        // 轨迹可视化
+                        Spacer(Modifier.height(10.dp))
+                        TrackCanvas(points = trackPoints)
+                        Spacer(Modifier.height(12.dp))
+
                         // 展示停留点（简化：按时间列出首尾若干点）
                         val shown = trackPoints.let {
                             if (it.size <= 10) it
