@@ -29,6 +29,24 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 
 /**
+ * 选择瓦片源。
+ *
+ * OSM 官方瓦片在国内常被 DNS 污染，提供三个备选源供切换：
+ * - wikimedia：维基媒体地图（默认，国内相对易访问）
+ * - topo：OpenTopoMap（地形图）
+ * - osm：OSM 官方（国外网络环境用）
+ */
+private fun resolveTileSource(context: android.content.Context): org.osmdroid.tileprovider.tilesource.ITileSource {
+    val pref = context.getSharedPreferences("map_prefs", android.content.Context.MODE_PRIVATE)
+    val choice = pref.getString("tile_source", "wikimedia") ?: "wikimedia"
+    return when (choice) {
+        "osm" -> TileSourceFactory.MAPNIK
+        "topo" -> TileSourceFactory.OpenTopo
+        else -> TileSourceFactory.WIKIMEDIA
+    }
+}
+
+/**
  * 基于 OSM 的轨迹地图（可选底图）。
  *
  * 使用 osmdroid + OpenStreetMap 瓦片，开源、无需 API Key。
@@ -76,7 +94,9 @@ fun OsmTrackMap(
             modifier = Modifier.fillMaxWidth().height(220.dp),
             factory = { ctx ->
                 MapView(ctx).apply {
-                    setTileSource(TileSourceFactory.MAPNIK)
+                    // 尝试多个瓦片源：OSM 官方在国内常被污染，
+                    // 提供替代源供用户切换
+                    setTileSource(resolveTileSource(context))
                     setMultiTouchControls(true)
                     overlays.add(CopyrightOverlay(ctx))
 

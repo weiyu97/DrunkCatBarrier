@@ -201,6 +201,25 @@ fun GlassReviewScreen(
                                 scope.launch { prefs.setMapEnabled(next) }
                             }
                         )
+                        if (mapEnabled) {
+                            Spacer(Modifier.height(6.dp))
+                            GlassSecondaryButton(
+                                text = "切换瓦片源",
+                                onClick = {
+                                    val p = context.getSharedPreferences(
+                                        "map_prefs", android.content.Context.MODE_PRIVATE
+                                    )
+                                    val cur = p.getString("tile_source", "wikimedia")
+                                    val (next, label) = when (cur) {
+                                        "wikimedia" -> "topo" to "OpenTopoMap"
+                                        "topo" -> "osm" to "OSM 官方"
+                                        else -> "wikimedia" to "维基媒体"
+                                    }
+                                    p.edit().putString("tile_source", next).apply()
+                                    toast = "已切换为 $label（重进复盘页生效）"
+                                }
+                            )
+                        }
                         Spacer(Modifier.height(12.dp))
 
                         // 展示停留点（简化：按时间列出首尾若干点）
