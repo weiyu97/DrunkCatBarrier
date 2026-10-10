@@ -73,6 +73,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+    // 可选地图底图（OSM，开源，无需 API Key）
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")

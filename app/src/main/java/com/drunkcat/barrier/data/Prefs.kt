@@ -30,6 +30,7 @@ class Prefs(private val context: Context) {
         val AUTO_PROTECT = booleanPreferencesKey("auto_protect")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val SKIP_AUTO_UNTIL = longPreferencesKey("skip_auto_until")
+        val MAP_ENABLED = booleanPreferencesKey("map_enabled")
         val FAILURE_COUNT = intPreferencesKey("failure_count")
         val COOLDOWN_UNTIL = longPreferencesKey("cooldown_until")
     }
@@ -160,6 +161,16 @@ class Prefs(private val context: Context) {
         val until = getSkipAutoUntil()
         return until > 0L && System.currentTimeMillis() < until
     }
+
+    // ---------- 地图底图开关（默认关闭，纯本地优先） ----------
+
+    suspend fun setMapEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.MAP_ENABLED] = enabled }
+    }
+
+    /** 默认关闭：保持纯本地，用户主动开启后才下载地图瓦片 */
+    val mapEnabledFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.MAP_ENABLED] ?: false }
 
     // ---------- 失败计数与冷却 ----------
 

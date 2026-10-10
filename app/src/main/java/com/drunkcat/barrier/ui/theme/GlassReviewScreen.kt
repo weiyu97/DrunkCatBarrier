@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drunkcat.barrier.report.InterceptLog
 import com.drunkcat.barrier.track.TrackStore
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -54,12 +55,14 @@ fun GlassReviewScreen(
     val context = LocalContext.current
     val logStore = remember { InterceptLog(context) }
     val trackStore = remember { TrackStore(context) }
+    val prefs = remember { com.drunkcat.barrier.data.Prefs(context) }
 
     var entries by remember { mutableStateOf<List<InterceptLog.Entry>>(emptyList()) }
     var trackPoints by remember { mutableStateOf<List<com.drunkcat.barrier.track.TrackPoint>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
+    var mapEnabled by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -72,6 +75,11 @@ fun GlassReviewScreen(
         val tToday = trackStore.readDay(now)
         val tYesterday = trackStore.readDay(now - 24 * 3600 * 1000L)
         trackPoints = (tYesterday + tToday).sortedBy { it.timestamp }
+
+        // 读取地图开关
+        mapEnabled = try {
+            prefs.mapEnabledFlow.first()
+        } catch (e: Exception) { false }
 
         loaded = true
     }
@@ -176,9 +184,23 @@ fun GlassReviewScreen(
                             fontFamily = FontFamily.Serif
                         )
                     } else {
-                        // 轨迹可视化
+                        // 轨迹可视化：按开关选择底图
                         Spacer(Modifier.height(10.dp))
-                        TrackCanvas(points = trackPoints)
+                        if (mapEnabled) {
+                            OsmTrackMap(points = trackPoints)
+                        } else {
+                            TrackCanvas(points = trackPoints)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        GlassSecondaryButton(
+                            text = if (mapEnabled) "切换为简化路径（不联网）"
+                            else "加载地图底图（需联网）",
+                            onClick = {
+                                val next = !mapEnabled
+                                mapEnabled = next
+                                scope.launch { prefs.setMapEnabled(next) }
+                            }
+                        )
                         Spacer(Modifier.height(12.dp))
 
                         // 展示停留点（简化：按时间列出首尾若干点）
