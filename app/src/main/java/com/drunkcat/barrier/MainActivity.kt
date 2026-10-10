@@ -161,6 +161,20 @@ class MainActivity : ComponentActivity() {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 }
 
+/**
+ * 构建 LockTask 允许名单：
+ * 本应用 + 永久白名单 + 用户自定义白名单
+ */
+private fun buildAllowedPackages(
+    context: Context,
+    userWhitelist: Set<String>
+): List<String> {
+    val result = mutableSetOf(context.packageName)
+    result.addAll(com.drunkcat.barrier.data.PermanentWhitelist.PACKAGES)
+    result.addAll(userWhitelist)
+    return result.toList()
+}
+
 /** 打开系统无障碍设置页 */
 private fun openAccessibilitySettings(context: Context) {
     try {
@@ -234,8 +248,10 @@ private fun AppRoot(
                     protectionActive = false
                     // 清空风险信号，避免刚解除又被自动触发
                     com.drunkcat.barrier.risk.RiskMonitor.reset()
+                    // 恢复被隐藏的应用 + 清空 LockTask 允许名单
                     locked.forEach { manager.unhideApp(it) }
-                    manager.clearLockedPackages()
+                    manager.clearAllowedPackages()
+                    prefs.setProtectionUntil(0L)
                     LockService.stop(context)
                     refresh()
                     onToast("保护已停止")
@@ -427,9 +443,16 @@ private fun AppRoot(
                             // 开启保护开关，AppWatchService 据此拦截
                             prefs.setProtectionActive(true)
                             protectionActive = true
-                            // Device Owner 路径：锁定 + 隐藏
-                            if (state.isDeviceOwner && locked.isNotEmpty()) {
-                                manager.setLockedPackages(locked.toList())
+                            // 设置到期时间：下一个早上 8:00
+                            prefs.setProtectionUntil(
+                                com.drunkcat.barrier.data.ContractTime.nextMorning8()
+                            )
+                            // Device Owner 路径：
+                            // 1. 设置 LockTask 允许名单（本应用 + 永久白名单 + 用户白名单）
+                            // 2. 隐藏被锁应用
+                            if (state.isDeviceOwner) {
+                                val allowed = buildAllowedPackages(context, whitelist)
+                                manager.setAllowedPackages(allowed)
                                 locked.forEach { manager.hideApp(it) }
                             }
                             LockService.start(context)
@@ -447,8 +470,9 @@ private fun AppRoot(
                     onConfirm = {
                         scope.launch {
                             prefs.setContractMode(contractMode.name)
-                            if (locked.isNotEmpty()) {
-                                manager.setLockedPackages(locked.toList())
+                            if (state.isDeviceOwner) {
+                                val allowed = buildAllowedPackages(context, whitelist)
+                                manager.setAllowedPackages(allowed)
                                 locked.forEach { manager.hideApp(it) }
                             }
                             LockService.start(context)

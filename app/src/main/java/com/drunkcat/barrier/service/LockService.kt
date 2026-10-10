@@ -54,9 +54,28 @@ class LockService : Service() {
             while (true) {
                 delay(MONITOR_INTERVAL_MS)
                 checkStatus()
+                checkExpiry()
             }
         }
         return START_STICKY
+    }
+
+    /**
+     * 检查契约是否到期。
+     * 到期则自动解除保护并停止服务。
+     */
+    private suspend fun checkExpiry() {
+        val until = prefs.getProtectionUntil()
+        if (until <= 0L) return
+        if (System.currentTimeMillis() < until) return
+
+        // 到期：解除保护
+        prefs.setProtectionActive(false)
+        prefs.setProtectionUntil(0L)
+        // 清空风险信号
+        com.drunkcat.barrier.risk.RiskMonitor.reset()
+        // 停止服务
+        stopSelf()
     }
 
     private suspend fun checkStatus() {

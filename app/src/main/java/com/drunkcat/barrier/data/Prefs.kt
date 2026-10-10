@@ -3,6 +3,7 @@ package com.drunkcat.barrier.data
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +25,7 @@ class Prefs(private val context: Context) {
         val PROTECTION_LEVEL = stringPreferencesKey("protection_level")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val PROTECTION_ACTIVE = booleanPreferencesKey("protection_active")
+        val PROTECTION_UNTIL = longPreferencesKey("protection_until")
     }
 
     // ---------- PIN ----------
@@ -103,6 +105,19 @@ class Prefs(private val context: Context) {
 
     val protectionFlow: Flow<Boolean> =
         context.dataStore.data.map { it[Keys.PROTECTION_ACTIVE] ?: false }
+
+    // ---------- 保护到期时间 ----------
+
+    /** 设置保护到期时间戳（0 表示不自动解除） */
+    suspend fun setProtectionUntil(until: Long) {
+        context.dataStore.edit { it[Keys.PROTECTION_UNTIL] = until }
+    }
+
+    suspend fun getProtectionUntil(): Long =
+        context.dataStore.data.first()[Keys.PROTECTION_UNTIL] ?: 0L
+
+    val protectionUntilFlow: Flow<Long> =
+        context.dataStore.data.map { it[Keys.PROTECTION_UNTIL] ?: 0L }
 }
 
 enum class ContractMode { QUICK, FULL }

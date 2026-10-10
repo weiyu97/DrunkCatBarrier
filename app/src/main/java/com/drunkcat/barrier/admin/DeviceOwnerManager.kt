@@ -33,25 +33,33 @@ class DeviceOwnerManager(private val context: Context) {
         hasAccounts = !hasNoAccounts(),
         sdkInt = Build.VERSION.SDK_INT,
         activationCommand = getActivationCommand(),
-        lockedPackages = getLockedPackages(),
+        lockedPackages = getAllowedPackages(),
         safeBootDisabled = isUserRestrictionSet(UserManager.DISALLOW_SAFE_BOOT),
         factoryResetDisabled = isUserRestrictionSet(UserManager.DISALLOW_FACTORY_RESET),
         inLockTaskMode = isInLockTaskMode()
     )
 
-    // ---------- 应用锁定 ----------
+    // ---------- LockTask 允许名单 ----------
 
-    fun setLockedPackages(packages: List<String>) {
+    /**
+     * 设置 LockTask 模式下**允许**运行的应用（白名单）。
+     *
+     * 注意：setLockTaskPackages 接收的是允许名单，不是禁止名单。
+     * 禁止的应用应通过 setApplicationHidden 隐藏。
+     *
+     * 白名单应包含：本应用 + 永久白名单（电话/地图/打车等）+ 用户自定义白名单。
+     */
+    fun setAllowedPackages(packages: List<String>) {
         if (!isDeviceOwner()) return
         dpm.setLockTaskPackages(admin, packages.toTypedArray())
     }
 
-    fun clearLockedPackages() {
+    fun clearAllowedPackages() {
         if (!isDeviceOwner()) return
         dpm.setLockTaskPackages(admin, emptyArray())
     }
 
-    fun getLockedPackages(): List<String> {
+    fun getAllowedPackages(): List<String> {
         if (!isDeviceOwner()) return emptyList()
         return dpm.getLockTaskPackages(admin).toList()
     }
