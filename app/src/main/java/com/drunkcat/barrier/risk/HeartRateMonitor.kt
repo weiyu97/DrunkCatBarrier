@@ -32,7 +32,11 @@ import androidx.core.content.ContextCompat
  * 都会影响心率，因此它只作为风险评分的一个**弱信号**，
  * 不能单独触发保护。
  */
-class HeartRateMonitor(private val context: Context) {
+class HeartRateMonitor(private val context: Context) : WearableProvider {
+
+    override val name: String = "标准 BLE 心率"
+
+    override fun isConnected(): Boolean = gatt != null
 
     /** 标准心率服务 UUID */
     private val HR_SERVICE = java.util.UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb")
@@ -54,7 +58,7 @@ class HeartRateMonitor(private val context: Context) {
     /** 上次上报异常的时间，避免频繁触发 */
     @Volatile private var lastReportAt: Long = 0L
 
-    fun hasPermission(): Boolean {
+    override fun hasPermission(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val scan = ContextCompat.checkSelfPermission(
                 context, android.Manifest.permission.BLUETOOTH_SCAN
@@ -71,7 +75,7 @@ class HeartRateMonitor(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    fun start() {
+    override fun start() {
         if (!hasPermission()) return
         if (scanning || gatt != null) return
 
@@ -91,7 +95,7 @@ class HeartRateMonitor(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    fun stop() {
+    override fun stop() {
         try {
             val bm = context.getSystemService(Context.BLUETOOTH_SERVICE)
                 as? BluetoothManager

@@ -215,6 +215,14 @@ class AppWatchService : AccessibilityService() {
     }
 
     companion object {
+        /** 最近一次心率读数（0 表示无数据） */
+        val currentHeartRate: Int
+            get() = instance?.heartRateMonitor?.lastHeartRate ?: 0
+
+        /** 心率手环是否已连接 */
+        val heartRateConnected: Boolean
+            get() = instance?.heartRateMonitor?.isConnected() == true
+
         /**
          * 验证通过后给予临时使用权限。
          *

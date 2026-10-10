@@ -696,6 +696,17 @@ private fun AppRoot(
         Screen.CHECKUP -> {
             val health = com.drunkcat.barrier.service.HealthCheck.check(context)
             val a11yOn = isAccessibilityEnabled(context)
+
+            // 心率实时读取（体检页停留期间每秒刷新）
+            var hr by remember { mutableIntStateOf(0) }
+            var hrConnected by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    hr = com.drunkcat.barrier.service.AppWatchService.currentHeartRate
+                    hrConnected = com.drunkcat.barrier.service.AppWatchService.heartRateConnected
+                    kotlinx.coroutines.delay(1000)
+                }
+            }
             com.drunkcat.barrier.ui.theme.GlassCheckupScreen(
                 items = listOf(
                     com.drunkcat.barrier.ui.theme.CheckupItem(
@@ -775,10 +786,12 @@ private fun AppRoot(
                     ),
                     com.drunkcat.barrier.ui.theme.CheckupItem(
                         title = "心率手环",
-                        desc = if (health.bluetoothOk)
-                            "已授权。请在手环上开启心率广播，App 会自动连接"
-                        else "未授权，可选功能（用于心率辅助判断）",
-                        ok = health.bluetoothOk,
+                        desc = when {
+                            hrConnected && hr > 0 -> "已连接，当前心率 $hr BPM"
+                            health.bluetoothOk -> "已授权。请在手环上开启心率广播，App 会自动连接"
+                            else -> "未授权，可选功能（用于心率辅助判断）"
+                        },
+                        ok = hrConnected && hr > 0,
                         critical = false,
                         action = {
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
