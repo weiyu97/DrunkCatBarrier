@@ -61,7 +61,8 @@ fun GlassHomeScreen(
     onOpenAccessibility: () -> Unit,
     onNavContract: () -> Unit,
     onNavTrial: () -> Unit,
-    onNavReview: () -> Unit
+    onNavReview: () -> Unit,
+    onOpenCheckup: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -175,24 +176,12 @@ fun GlassHomeScreen(
                         }
                     }
 
-                    if (!state.isDeviceOwner || !hasPin) {
-                        Row(
-                            modifier = Modifier.padding(top = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            UiIcon(
-                                type = UiIconType.WARNING,
-                                size = 14.dp,
-                                tint = Glass.Primary
-                            )
-                            Text(
-                                text = " 检测到结界破口。修复前强行开启，后果自负。",
-                                fontSize = 11.5.sp,
-                                color = Glass.Primary,
-                                fontFamily = FontFamily.Serif
-                            )
-                        }
-                    }
+                    Spacer(Modifier.height(10.dp))
+
+                    GlassSecondaryButton(
+                        text = "一键体检",
+                        onClick = onOpenCheckup
+                    )
                 }
 
                 Spacer(Modifier.height(12.dp))

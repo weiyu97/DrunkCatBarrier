@@ -209,6 +209,15 @@ private fun AppRoot(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // 体检页：定位权限请求器
+    val locationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { }
+
+    // 体检页：Device Owner 说明对话框
+    var showDeviceOwnerDialog by remember { mutableStateOf(false) }
+
     var screen by remember { mutableStateOf(Screen.HOME) }
     var state by remember { mutableStateOf(manager.buildState()) }
     var apps by remember { mutableStateOf<List<InstalledApps.AppInfo>>(emptyList()) }
@@ -385,7 +394,8 @@ private fun AppRoot(
                     onOpenAccessibility = { openAccessibilitySettings(context) },
                     onNavContract = startContract,
                     onNavTrial = { screen = Screen.VERIFICATION },
-                    onNavReview = { screen = Screen.REVIEW }
+                    onNavReview = { screen = Screen.REVIEW },
+                    onOpenCheckup = { screen = Screen.CHECKUP }
                 )
             } else {
                 HomeScreen(
@@ -606,6 +616,131 @@ private fun AppRoot(
         Screen.REVIEW -> {
             GlassReviewScreen()
         }
+
+        Screen.CHECKUP -> {
+            val health = com.drunkcat.barrier.service.HealthCheck.check(context)
+            val a11yOn = isAccessibilityEnabled(context)
+            com.drunkcat.barrier.ui.theme.GlassCheckupScreen(
+                items = listOf(
+                    com.drunkcat.barrier.ui.theme.CheckupItem(
+                        title = "无障碍服务",
+                        desc = if (a11yOn) "已开启，可检测前台应用"
+                        else "未开启，自动保护无法生效",
+                        ok = a11yOn,
+                        critical = true,
+                        action = { openAccessibilitySettings(context) }
+                    ),
+                    com.drunkcat.barrier.ui.theme.CheckupItem(
+                        title = "通知权限",
+                        desc = if (health.notificationOk) "已授权，预警可正常提醒"
+                        else "未授权，30 秒预警将静默失效",
+                        ok = health.notificationOk,
+                        critical = false,
+                        action = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                try {
+                                    context.startActivity(
+                                        Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                            .putExtra(
+                                                android.provider.Settings.EXTRA_APP_PACKAGE,
+                                                context.packageName
+                                            )
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                } catch (e: Exception) { }
+                            }
+                        }
+                    ),
+                    com.drunkcat.barrier.ui.theme.CheckupItem(
+                        title = "清醒试炼 PIN",
+                        desc = if (pin != null) "已设置"
+                        else "未设置，无法阻止他人解除保护",
+                        ok = pin != null,
+                        critical = true,
+                        action = { screen = Screen.PIN_SET }
+                    ),
+                    com.drunkcat.barrier.ui.theme.CheckupItem(
+                        title = "封印名单",
+                        desc = if (locked.isNotEmpty()) "已配置 ${locked.size} 个应用"
+                        else "未配置，可套用默认清单",
+                        ok = locked.isNotEmpty(),
+                        critical = false,
+                        action = { screen = Screen.APP_PICKER }
+                    ),
+                    com.drunkcat.barrier.ui.theme.CheckupItem(
+                        title = "定位权限",
+                        desc = if (health.locationOk) "已授权，可记录轨迹"
+                        else "未授权，无法记录轨迹",
+                        ok = health.locationOk,
+                        critical = false,
+                        action = {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        }
+                    ),
+                    com.drunkcat.barrier.ui.theme.CheckupItem(
+                        title = "电池优化白名单",
+                        desc = if (health.batteryOptimized) "已加入，服务可常驻"
+                        else "未加入，后台可能被系统杀死",
+                        ok = health.batteryOptimized,
+                        critical = false,
+                        action = {
+                            try {
+                                context.startActivity(
+                                    Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            } catch (e: Exception) { }
+                        }
+                    ),
+                    com.drunkcat.barrier.ui.theme.CheckupItem(
+                        title = "Device Owner 完整封印",
+                        desc = if (state.isDeviceOwner) "已激活，最强锁定能力"
+                        else "未激活，当前使用无障碍降级模式",
+                        ok = state.isDeviceOwner,
+                        critical = false,
+                        action = { showDeviceOwnerDialog = true }
+                    )
+                ),
+                onBack = { screen = Screen.HOME }
+            )
+        }
+    }
+
+    // Device Owner 激活说明对话框
+    if (showDeviceOwnerDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDeviceOwnerDialog = false },
+            title = {
+                Text(
+                    "激活 Device Owner 完整封印",
+                    fontFamily = FontFamily.Serif
+                )
+            },
+            text = {
+                Text(
+                    "需要电脑配合，通过 ADB 命令激活：\n\n" +
+                    "1. 确保设备无任何账户\n" +
+                    "2. 开启 USB 调试\n" +
+                    "3. 电脑上执行：\n\n" +
+                    "adb shell dpm set-device-owner\n" +
+                    "com.drunkcat.barrier/.admin.DrunkCatAdminReceiver\n\n" +
+                    "激活后解锁最强锁定能力：LockTask 模式、隐藏应用、防卸载。",
+                    fontFamily = FontFamily.Serif
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { showDeviceOwnerDialog = false }
+                ) {
+                    Text("知道了", fontFamily = FontFamily.Serif)
+                }
+            }
+        )
     }
 }
 

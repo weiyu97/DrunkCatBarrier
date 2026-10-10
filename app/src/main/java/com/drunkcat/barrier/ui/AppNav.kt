@@ -11,5 +11,6 @@ enum class Screen {
     CONTRACT,
     VERIFICATION,
     APP_PICKER,
-    REVIEW
+    REVIEW,
+    CHECKUP
 }
