@@ -52,8 +52,8 @@ private val STAGE_SIZE = 460.dp
 private val STAGE_OFFSET_Y = (-30).dp
 // Header 可见背景高度
 private val HEADER_HEIGHT = 260.dp
-// Logo 尺寸
-private val LOGO_SIZE = 96.dp
+// Logo 尺寸（略缩，让魔法阵结构更清晰）
+private val LOGO_SIZE = 84.dp
 
 @Composable
 fun GlassHeader(
@@ -136,16 +136,11 @@ fun GlassHeader(
                     )
             )
 
-            // ---- 层 B：魔法阵（循环脉冲缩放 + 旋转，围绕舞台中心） ----
+            // ---- 层 B：魔法阵（脉冲缩放 + 整体旋转，内部含多层动态特效） ----
             MagicCircle(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        transformOrigin = TransformOrigin.Center
-                        scaleX = circleScale
-                        scaleY = circleScale
-                        rotationZ = rotation
-                    }
+                modifier = Modifier.fillMaxSize(),
+                rotation = rotation,
+                scale = circleScale
             )
 
             // ---- 层 C：猫头 Logo（固定居中，不参与缩放） ----
