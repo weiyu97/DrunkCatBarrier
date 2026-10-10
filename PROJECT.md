@@ -231,9 +231,22 @@ com.drunkcat.barrier/
 设置中一键切换，偏好持久化。
 
 
-## 十、Device Owner 与降级路径
+## 十、三种权限模式
 
-### 10.1 Device Owner（首选）
+### 10.1 模式对比
+
+| 模式 | 门槛 | 锁定能力 | 适用人群 |
+|---|---|---|---|
+| **Profile Owner** | 一键创建，无需电脑 | 工作资料内锁定 | 普通用户（推荐） |
+| **Device Owner** | ADB 激活，需无账户 | 全设备最强锁定 | 高级用户/备用机 |
+| **无障碍降级** | 开启无障碍服务 | 前台拦截 | 兜底，所有设备 |
+
+### 10.2 Profile Owner（推荐，无需电脑）
+
+在 App 内一键创建工作资料，**无需删除个人账户、无需恢复出厂、无需电脑**。
+在工作资料内拥有隐藏应用、LockTask 等管理能力。
+
+### 10.3 Device Owner（高级）
 
 激活命令：
 \`\`\`
@@ -244,7 +257,7 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 
 能力：LockTask 模式、隐藏应用、禁用安全模式/恢复出厂、天然防卸载。
 
-### 10.2 无障碍降级
+### 10.4 无障碍降级（兜底）
 
 无法激活 Device Owner 时使用。监听窗口变化，检测到被锁 App 弹出验证。
 
