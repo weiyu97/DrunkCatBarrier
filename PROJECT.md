@@ -117,6 +117,7 @@ com.drunkcat.barrier/
 | HIGH_RISK_APP | 20 | 打开通讯录/短信/社交/支付类应用 |
 | DEVICE_SHAKING | 15 | 加速度计检测持续晃动 |
 | HEART_RATE_ANOMALY | 12 | 手环心率持续偏高（弱信号，需连续 5 次超基线 30%） |
+| TYPING_ANOMALY | 10 | 打字删除率异常（仅统计数量，不读内容） |
 | SUDDEN_ACTIVITY | 10 | 长时间无操作后突然活跃 |
 
 ### 5.2 判定规则
@@ -350,18 +351,15 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 - [x] 健康检查提示（通知权限/无障碍状态）
 
 **工程**
-- [x] Release 签名与 R8 混淆
+- [x] Release 签名（R8 已关闭，避免丢失 Compose 动画）
 - [x] Git 仓库 + Apache 2.0 LICENSE
-- [x] 67 个单元测试
+- [x] 79 个单元测试
 
 ### 待办
 
 - [ ] 真机 Device Owner 验证（需无账户设备）
-- [ ] Gadgetbridge 数据桥接（路径三，可选高级功能）
-- [ ] 小米运动健康开放平台接入（路径二）
 - [ ] 开源发布（GitHub / F-Droid）
-- [ ] 轨迹地图可视化
-- [ ] 开源发布（GitHub / F-Droid）
+- [ ] 轨迹地图底图（当前为 Canvas 简化绘制）
 
 
 ## 十五、参考项目
@@ -371,6 +369,7 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 | LockLock | 无障碍锁定 + Device Admin 防卸载 |
 | AppLock (Device Owner) | Device Owner 真锁定 |
 | OwnDroid | Device Owner 权限管理 |
+| Gadgetbridge | 开源手环数据管理，本项目的桥接数据源 |
 
 
 ## 十六、许可证
