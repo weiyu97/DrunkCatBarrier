@@ -48,9 +48,8 @@ class HeartRateMonitor(private val context: Context) {
     @Volatile var lastHeartRate: Int = 0
         private set
 
-    /** 基线心率（静息，用于判断异常） */
-    @Volatile private var baselineHr: Int = 0
-    private val recentHr = ArrayDeque<Int>()
+    /** 心率分析器（纯逻辑） */
+    private val analyzer = HeartRateAnalyzer()
 
     /** 上次上报异常的时间，避免频繁触发 */
     @Volatile private var lastReportAt: Long = 0L
@@ -196,26 +195,14 @@ class HeartRateMonitor(private val context: Context) {
      * 但运动和紧张也会升高，因此仅当「静息状态下持续偏高」才上报。
      */
     private fun analyze(hr: Int) {
-        recentHr.addLast(hr)
-        if (recentHr.size > 20) recentHr.removeFirst()
-
-        // 建立基线：取前 10 次的平均值
-        if (baselineHr == 0 && recentHr.size >= 10) {
-            baselineHr = recentHr.average().toInt()
-        }
-
-        // 判断：相比基线升高 30% 以上，且持续（最近 5 次均偏高）
-        if (baselineHr > 0 && recentHr.size >= 5) {
-            val recent5 = recentHr.toList().takeLast(5)
-            val allElevated = recent5.all { it > baselineHr * 1.3 }
-            if (allElevated) {
-                val now = System.currentTimeMillis()
-                if (now - lastReportAt > 10 * 60 * 1000L) {
-                    lastReportAt = now
-                    RiskMonitor.onHeartRateAnomaly(
-                        "基线 $baselineHr，当前 $hr"
-                    )
-                }
+        val anomalous = analyzer.addReading(hr)
+        if (anomalous) {
+            val now = System.currentTimeMillis()
+            if (now - lastReportAt > 10 * 60 * 1000L) {
+                lastReportAt = now
+                RiskMonitor.onHeartRateAnomaly(
+                    "基线 ${analyzer.currentBaseline()}，当前 $hr"
+                )
             }
         }
     }
