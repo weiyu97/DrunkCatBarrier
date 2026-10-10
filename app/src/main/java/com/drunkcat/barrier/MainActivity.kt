@@ -221,6 +221,8 @@ private fun AppRoot(
     var onboardingDone by remember { mutableStateOf<Boolean?>(null) }
     var onboardingStep by remember { mutableIntStateOf(0) }
     var endHour by remember { mutableIntStateOf(com.drunkcat.barrier.data.ContractTime.DEFAULT_HOUR) }
+    // 待验证的操作：非 null 时显示 PIN 验证界面
+    var pendingStop by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         apps = InstalledApps.list(context)
@@ -244,6 +246,41 @@ private fun AppRoot(
     }
 
     fun refresh() { state = manager.buildState() }
+
+    // ===== 共享动作（在导航分支之前定义，供多处引用）=====
+
+    // 实际执行停止
+    val doStop: () -> Unit = {
+        scope.launch {
+            prefs.setProtectionActive(false)
+            protectionActive = false
+            com.drunkcat.barrier.risk.RiskMonitor.reset()
+            locked.forEach { manager.unhideApp(it) }
+            manager.clearAllowedPackages()
+            prefs.setProtectionUntil(0L)
+            LockService.stop(context)
+            refresh()
+            onToast("保护已停止")
+        }
+    }
+
+    // 停止保护：保护中时需过 PIN 验证
+    val stopProtection: () -> Unit = {
+        if (protectionActive && pin != null) {
+            pendingStop = true
+        } else {
+            doStop()
+        }
+    }
+
+    // 开启契约
+    val startContract: () -> Unit = {
+        if (pin == null) {
+            onToast("请先设置 PIN")
+        } else {
+            screen = Screen.CONTRACT
+        }
+    }
 
     // 读取偏好期间显示空白，避免首帧闪主页
     if (onboardingDone == null) {
@@ -272,31 +309,45 @@ private fun AppRoot(
         return
     }
 
+    // 停止保护前的 PIN 验证
+    if (pendingStop) {
+        val expected = pin
+        if (expected == null) {
+            pendingStop = false
+        } else {
+            if (themeMode == ThemeMode.GLASS) {
+                GlassPinVerifyScreen(
+                    expected = expected,
+                    onSuccess = {
+                        pendingStop = false
+                        doStop()
+                    },
+                    onFailure = {
+                        pendingStop = false
+                        onToast("PIN 错误，保护继续")
+                    },
+                    onCancel = { pendingStop = false }
+                )
+            } else {
+                PinVerifyScreen(
+                    expected = expected,
+                    onSuccess = {
+                        pendingStop = false
+                        doStop()
+                    },
+                    onFailure = {
+                        pendingStop = false
+                        onToast("PIN 错误，保护继续")
+                    },
+                    onCancel = { pendingStop = false }
+                )
+            }
+            return
+        }
+    }
+
     when (screen) {
         Screen.HOME -> {
-            val startContract: () -> Unit = {
-                if (pin == null) {
-                    onToast("请先设置 PIN")
-                } else {
-                    screen = Screen.CONTRACT
-                }
-            }
-            val stopProtection: () -> Unit = {
-                scope.launch {
-                    prefs.setProtectionActive(false)
-                    protectionActive = false
-                    // 清空风险信号，避免刚解除又被自动触发
-                    com.drunkcat.barrier.risk.RiskMonitor.reset()
-                    // 恢复被隐藏的应用 + 清空 LockTask 允许名单
-                    locked.forEach { manager.unhideApp(it) }
-                    manager.clearAllowedPackages()
-                    prefs.setProtectionUntil(0L)
-                    LockService.stop(context)
-                    refresh()
-                    onToast("保护已停止")
-                }
-            }
-
             if (themeMode == ThemeMode.GLASS) {
                 com.drunkcat.barrier.ui.theme.GlassHomeScreen(
                     state = state,
