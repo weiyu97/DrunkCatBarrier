@@ -3,5 +3,8 @@
     <uses-policies>
         <force-lock />
         <wipe-data />
+        <set-application-hidden />
+        <set-lock-task-packages />
+        <disable-camera />
     </uses-policies>
 </device-admin>

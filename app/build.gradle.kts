@@ -31,12 +31,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // 关闭代码/资源压缩：R8 会剥离或重命名 Compose 运行时类，
+            // 导致动画、状态丢失。本项目体积优先让位于功能完整。
+            isMinifyEnabled = false
+            isShrinkResources = false
             val ksFile = rootProject.file("release.jks")
             if (ksFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")

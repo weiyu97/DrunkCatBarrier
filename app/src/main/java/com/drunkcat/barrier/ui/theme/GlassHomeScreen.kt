@@ -91,8 +91,8 @@ fun GlassHomeScreen(
                 ) {
                     CardTitle("结界状态祭坛")
 
-                    // 已缔结：有 PIN 且（Device Owner 模式 或 无障碍降级模式已开启）
-                    val sealed = hasPin && (state.isDeviceOwner || protectionActive)
+                    // 已缔结：有 PIN 且（有管理权限 或 无障碍降级已开启）
+                    val sealed = hasPin && (state.hasManagement || protectionActive)
                     Box(modifier = Modifier.padding(bottom = 9.dp)) {
                         PillTag(
                             text = if (sealed) "† 结界已缔结 †" else "† 结界尚未缔结 †",
@@ -112,9 +112,9 @@ fun GlassHomeScreen(
                         modifier = Modifier.padding(bottom = 13.dp)
                     )
 
-                    if (!state.isDeviceOwner) {
+                    if (!state.hasManagement) {
                         GlassPrimaryButton(
-                            text = "缔结 Device-Owner 完整封印",
+                            text = "建立工作资料封印（推荐）",
                             onClick = onRequestAdmin
                         )
                         Spacer(Modifier.height(9.dp))
@@ -132,11 +132,18 @@ fun GlassHomeScreen(
                     CardTitle("结界戒律健康检测")
 
                     CheckItem(
-                        label = if (state.isDeviceOwner) "Device-Owner 完整封印"
-                        else "无障碍拦截（降级）",
-                        status = if (state.isDeviceOwner) "已缔结"
-                        else if (accessibilityOn) "已开启" else "未开启",
-                        ok = state.isDeviceOwner || accessibilityOn,
+                        label = when {
+                            state.isDeviceOwner -> "Device-Owner 完整封印"
+                            state.isProfileOwner -> "Profile-Owner 封印"
+                            else -> "无障碍拦截（降级）"
+                        },
+                        status = when {
+                            state.isDeviceOwner -> "已缔结"
+                            state.isProfileOwner -> "已缔结"
+                            accessibilityOn -> "已开启"
+                            else -> "未开启"
+                        },
+                        ok = state.hasManagement || accessibilityOn,
                         icon = UiIconType.SHIELD
                     )
                     CheckItem(

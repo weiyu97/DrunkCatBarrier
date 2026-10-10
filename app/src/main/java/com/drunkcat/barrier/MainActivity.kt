@@ -88,6 +88,8 @@ class MainActivity : ComponentActivity() {
     private val initialScreenState =
         androidx.compose.runtime.mutableStateOf<Screen?>(null)
 
+    private val REQUEST_PROVISION_PROFILE = 1001
+
     private val notifPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
@@ -189,7 +191,36 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * 请求管理权限。
+     *
+     * 优先引导用户创建工作资料（Profile Owner），
+     * 无需电脑、无需删除个人账户，普通用户即可完成。
+     */
     private fun requestDeviceAdmin() {
+        // 若设备已支持工作资料，直接发起创建
+        val dpm = getSystemService(DevicePolicyManager::class.java)
+        val intent = Intent(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE).apply {
+            putExtra(
+                DevicePolicyManager.EXTRA_PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME,
+                ComponentName(this@MainActivity, DrunkCatAdminReceiver::class.java)
+            )
+            putExtra(
+                DevicePolicyManager.EXTRA_PROVISIONING_SKIP_ENCRYPTION,
+                true
+            )
+        }
+        try {
+            startActivityForResult(intent, REQUEST_PROVISION_PROFILE)
+        } catch (e: Exception) {
+            // 设备不支持工作资料，降级到普通设备管理
+            toast("当前设备不支持工作资料，改用基础设备管理")
+            requestBasicAdmin()
+        }
+    }
+
+    /** 基础设备管理（防卸载，能力有限） */
+    private fun requestBasicAdmin() {
         val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
             putExtra(
                 DevicePolicyManager.EXTRA_DEVICE_ADMIN,
@@ -200,7 +231,22 @@ class MainActivity : ComponentActivity() {
                 "醉猫结界需要设备管理权限以防止被卸载。"
             )
         }
-        startActivity(intent)
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            toast("无法请求设备管理权限")
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_PROVISION_PROFILE) {
+            if (resultCode == RESULT_OK) {
+                toast("工作资料已创建，封印就位")
+            } else {
+                toast("已取消创建")
+            }
+        }
     }
 
     private fun toast(msg: String) =
@@ -633,10 +679,10 @@ private fun AppRoot(
                             prefs.setProtectionUntil(
                                 com.drunkcat.barrier.data.ContractTime.nextAt(chosenHour)
                             )
-                            // Device Owner 路径：
-                            // 1. 设置 LockTask 允许名单（本应用 + 永久白名单 + 用户白名单）
+                            // 管理路径（Device Owner 或 Profile Owner）：
+                            // 1. 设置 LockTask 允许名单
                             // 2. 隐藏被锁应用
-                            if (state.isDeviceOwner) {
+                            if (state.hasManagement) {
                                 val allowed = buildAllowedPackages(context, whitelist)
                                 manager.setAllowedPackages(allowed)
                                 locked.forEach { manager.hideApp(it) }
@@ -663,7 +709,7 @@ private fun AppRoot(
                             prefs.setProtectionUntil(
                                 com.drunkcat.barrier.data.ContractTime.nextAt(endHour)
                             )
-                            if (state.isDeviceOwner) {
+                            if (state.hasManagement) {
                                 val allowed = buildAllowedPackages(context, whitelist)
                                 manager.setAllowedPackages(allowed)
                                 locked.forEach { manager.hideApp(it) }

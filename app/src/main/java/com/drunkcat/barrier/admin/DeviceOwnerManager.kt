@@ -8,7 +8,13 @@ import android.os.Build
 import android.os.UserManager
 
 /**
- * Device Owner 管理：状态检测、激活引导、应用锁定。
+ * 权限管理器：Device Owner / Profile Owner / 无障碍降级。
+ *
+ * 三种模式的定位：
+ * - **Profile Owner**（推荐给普通用户）：创建工作资料，无需删除个人账户，
+ *   可管理工作资料内的应用。门槛最低。
+ * - **Device Owner**（高级用户）：最强锁定，但要求设备无账户。
+ * - **无障碍降级**（兜底）：所有设备可用，通过无障碍服务拦截。
  */
 class DeviceOwnerManager(private val context: Context) {
 
@@ -19,6 +25,25 @@ class DeviceOwnerManager(private val context: Context) {
 
     fun isDeviceOwner(): Boolean = dpm.isDeviceOwnerApp(context.packageName)
 
+    /** 本应用是否为某个资料的 Profile Owner */
+    fun isProfileOwner(): Boolean {
+        return try {
+            dpm.isProfileOwnerApp(context.packageName)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** 当前用户是否属于工作资料 */
+    fun isInWorkProfile(): Boolean {
+        return try {
+            val um = context.getSystemService(Context.USER_SERVICE) as UserManager
+            um.isManagedProfile
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     fun isAdminActive(): Boolean = dpm.isAdminActive(admin)
 
     private fun hasNoAccounts(): Boolean =
@@ -27,12 +52,19 @@ class DeviceOwnerManager(private val context: Context) {
     fun getActivationCommand(): String =
         "adb shell dpm set-device-owner ${context.packageName}/.admin.DrunkCatAdminReceiver"
 
+    /** Profile Owner 的 ADB 激活命令（无需无账户条件） */
+    fun getProfileOwnerCommand(): String =
+        "adb shell dpm set-profile-owner ${context.packageName}/.admin.DrunkCatAdminReceiver"
+
     fun buildState(): DeviceState = DeviceState(
         isDeviceOwner = isDeviceOwner(),
+        isProfileOwner = isProfileOwner(),
+        isInWorkProfile = isInWorkProfile(),
         isAdminActive = isAdminActive(),
         hasAccounts = !hasNoAccounts(),
         sdkInt = Build.VERSION.SDK_INT,
         activationCommand = getActivationCommand(),
+        profileOwnerCommand = getProfileOwnerCommand(),
         lockedPackages = getAllowedPackages(),
         safeBootDisabled = isUserRestrictionSet(UserManager.DISALLOW_SAFE_BOOT),
         factoryResetDisabled = isUserRestrictionSet(UserManager.DISALLOW_FACTORY_RESET),
@@ -49,34 +81,57 @@ class DeviceOwnerManager(private val context: Context) {
      *
      * 白名单应包含：本应用 + 永久白名单（电话/地图/打车等）+ 用户自定义白名单。
      */
+    /** 是否具备管理权限（Device Owner 或 Profile Owner） */
+    private fun hasManagement(): Boolean = isDeviceOwner() || isProfileOwner()
+
     fun setAllowedPackages(packages: List<String>) {
-        if (!isDeviceOwner()) return
-        dpm.setLockTaskPackages(admin, packages.toTypedArray())
+        if (!hasManagement()) return
+        try {
+            dpm.setLockTaskPackages(admin, packages.toTypedArray())
+        } catch (e: Exception) { }
     }
 
     fun clearAllowedPackages() {
-        if (!isDeviceOwner()) return
-        dpm.setLockTaskPackages(admin, emptyArray())
+        if (!hasManagement()) return
+        try {
+            dpm.setLockTaskPackages(admin, emptyArray())
+        } catch (e: Exception) { }
     }
 
     fun getAllowedPackages(): List<String> {
-        if (!isDeviceOwner()) return emptyList()
-        return dpm.getLockTaskPackages(admin).toList()
+        if (!hasManagement()) return emptyList()
+        return try {
+            dpm.getLockTaskPackages(admin).toList()
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     fun hideApp(packageName: String): Boolean {
-        if (!isDeviceOwner()) return false
-        return dpm.setApplicationHidden(admin, packageName, true)
+        if (!hasManagement()) return false
+        return try {
+            dpm.setApplicationHidden(admin, packageName, true)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun unhideApp(packageName: String): Boolean {
-        if (!isDeviceOwner()) return false
-        return dpm.setApplicationHidden(admin, packageName, false)
+        if (!hasManagement()) return false
+        return try {
+            dpm.setApplicationHidden(admin, packageName, false)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun isAppHidden(packageName: String): Boolean {
-        if (!isDeviceOwner()) return false
-        return dpm.isApplicationHidden(admin, packageName)
+        if (!hasManagement()) return false
+        return try {
+            dpm.isApplicationHidden(admin, packageName)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     // ---------- 用户限制 ----------
@@ -130,12 +185,26 @@ class DeviceOwnerManager(private val context: Context) {
 
 data class DeviceState(
     val isDeviceOwner: Boolean,
+    val isProfileOwner: Boolean,
+    val isInWorkProfile: Boolean,
     val isAdminActive: Boolean,
     val hasAccounts: Boolean,
     val sdkInt: Int,
     val activationCommand: String,
+    val profileOwnerCommand: String,
     val lockedPackages: List<String>,
     val safeBootDisabled: Boolean,
     val factoryResetDisabled: Boolean,
     val inLockTaskMode: Boolean
-)
+) {
+    /** 是否拥有任一管理权限 */
+    val hasManagement: Boolean get() = isDeviceOwner || isProfileOwner
+
+    /** 当前模式描述 */
+    val modeLabel: String
+        get() = when {
+            isDeviceOwner -> "Device Owner"
+            isProfileOwner -> "Profile Owner"
+            else -> "无障碍降级"
+        }
+}
