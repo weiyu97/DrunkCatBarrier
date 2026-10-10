@@ -487,6 +487,14 @@ private fun AppRoot(
                     onTestVerify = { screen = Screen.VERIFICATION },
                     onStopProtection = stopProtection,
                     protectionActive = protectionActive,
+                    onShowLockScreen = {
+                        try {
+                            context.startActivity(
+                                Intent(context, com.drunkcat.barrier.ui.LockScreenActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        } catch (e: Exception) { }
+                    },
                     autoProtectEnabled = autoProtectEnabled,
                     autoSkipped = autoSkipped,
                     onToggleSkipTonight = {

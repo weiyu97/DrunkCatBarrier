@@ -54,6 +54,7 @@ fun GlassHomeScreen(
     onTestVerify: () -> Unit,
     onStopProtection: () -> Unit,
     protectionActive: Boolean,
+    onShowLockScreen: () -> Unit,
     autoProtectEnabled: Boolean,
     autoSkipped: Boolean,
     onToggleAutoProtect: () -> Unit,
@@ -246,6 +247,13 @@ fun GlassHomeScreen(
                         onClick = onStartContract
                     )
                     Spacer(Modifier.height(9.dp))
+                    if (protectionActive) {
+                        GlassSecondaryButton(
+                            text = "进入锁屏",
+                            onClick = onShowLockScreen
+                        )
+                        Spacer(Modifier.height(9.dp))
+                    }
                     GlassGhostButton(
                         text = "停止保护",
                         onClick = onStopProtection
