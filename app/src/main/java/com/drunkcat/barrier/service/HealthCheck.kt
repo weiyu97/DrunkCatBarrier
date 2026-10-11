@@ -62,15 +62,27 @@ object HealthCheck {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    /** 无障碍服务是否开启 */
+    /** 无障碍服务是否开启（双方法，任一命中即算） */
     private fun checkAccessibility(context: Context): Boolean {
-        val enabled = android.provider.Settings.Secure.getString(
-            context.contentResolver,
-            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
-        return enabled.split(":").any {
-            it.contains(context.packageName) && it.contains("AppWatchService")
-        }
+        val byManager = try {
+            val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE)
+                as android.view.accessibility.AccessibilityManager
+            am.getEnabledAccessibilityServiceList(
+                android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK
+            ).any { it.resolveInfo?.serviceInfo?.packageName == context.packageName }
+        } catch (e: Exception) { false }
+
+        val bySettings = try {
+            val raw = android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            )
+            raw != null && raw != "null" && raw.split(":").any {
+                it.contains(context.packageName) && it.contains("AppWatchService")
+            }
+        } catch (e: Exception) { false }
+
+        return byManager || bySettings
     }
 
     /** 定位权限（影响轨迹记录，非关键） */

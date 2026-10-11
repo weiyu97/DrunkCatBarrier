@@ -277,15 +277,45 @@ private fun openAccessibilitySettings(context: Context) {
     } catch (e: Exception) { }
 }
 
-/** 检测本应用的无障碍服务是否已开启 */
+/**
+ * 检测本应用的无障碍服务是否已开启。
+ *
+ * 同时用两种方式，任一命中即算开启——单一方式在某些
+ * 系统版本上不可靠：
+ * 1. AccessibilityManager 官方 API
+ * 2. Settings.Secure 字符串
+ */
 private fun isAccessibilityEnabled(context: Context): Boolean {
-    val enabled = android.provider.Settings.Secure.getString(
-        context.contentResolver,
-        android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-    ) ?: return false
-    return enabled.split(":").any {
-        it.contains(context.packageName) && it.contains("AppWatchService")
+    // 方式 1：官方 API
+    val byManager = try {
+        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE)
+            as android.view.accessibility.AccessibilityManager
+        am.getEnabledAccessibilityServiceList(
+            android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK
+        ).any { it.resolveInfo?.serviceInfo?.packageName == context.packageName }
+    } catch (e: Exception) {
+        false
     }
+
+    // 方式 2：设置字符串
+    val bySettings = try {
+        val raw = android.provider.Settings.Secure.getString(
+            context.contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        )
+        raw != null && raw != "null" && raw.split(":").any {
+            it.contains(context.packageName) && it.contains("AppWatchService")
+        }
+    } catch (e: Exception) {
+        false
+    }
+
+    val hit = byManager || bySettings
+    android.util.Log.d(
+        "DrunkCat",
+        "a11y: pkg=${context.packageName} byManager=$byManager bySettings=$bySettings hit=$hit"
+    )
+    return hit
 }
 
 @Composable
