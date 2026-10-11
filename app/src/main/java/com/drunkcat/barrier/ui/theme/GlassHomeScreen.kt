@@ -113,17 +113,27 @@ fun GlassHomeScreen(
                         modifier = Modifier.padding(bottom = 13.dp)
                     )
 
-                    if (!state.hasManagement) {
-                        GlassPrimaryButton(
-                            text = "建立工作资料封印（推荐）",
-                            onClick = onRequestAdmin
-                        )
-                        Spacer(Modifier.height(9.dp))
-                    }
-                    GlassSecondaryButton(
+                    GlassPrimaryButton(
                         text = "开启堕天契约仪式",
                         onClick = onStartContract
                     )
+
+                    Spacer(Modifier.height(9.dp))
+
+                    if (!state.hasManagement) {
+                        GlassSecondaryButton(
+                            text = "高级：建立工作资料封印",
+                            onClick = onRequestAdmin
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = "仅隔离工作资料内的应用。拦截主用户应用请用下方「无障碍拦截」。",
+                            fontSize = 10.5.sp,
+                            lineHeight = 16.sp,
+                            color = Glass.OnSurfaceVariant,
+                            fontFamily = FontFamily.Serif
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -133,20 +143,27 @@ fun GlassHomeScreen(
                     CardTitle("结界戒律健康检测")
 
                     CheckItem(
-                        label = when {
-                            state.isDeviceOwner -> "Device-Owner 完整封印"
-                            state.isProfileOwner -> "Profile-Owner 封印"
-                            else -> "无障碍拦截（降级）"
-                        },
-                        status = when {
-                            state.isDeviceOwner -> "已缔结"
-                            state.isProfileOwner -> "已缔结"
-                            accessibilityOn -> "已开启"
-                            else -> "未开启"
-                        },
-                        ok = state.hasManagement || accessibilityOn,
+                        label = "无障碍拦截",
+                        status = if (accessibilityOn) "已开启" else "未开启",
+                        ok = accessibilityOn,
                         icon = UiIconType.SHIELD
                     )
+                    if (state.isDeviceOwner) {
+                        CheckItem(
+                            label = "Device-Owner 完整封印",
+                            status = "已缔结",
+                            ok = true,
+                            icon = UiIconType.SHIELD
+                        )
+                    }
+                    if (state.isProfileOwner) {
+                        CheckItem(
+                            label = "Profile-Owner（仅限工作资料）",
+                            status = "已缔结",
+                            ok = true,
+                            icon = UiIconType.SHIELD
+                        )
+                    }
                     CheckItem(
                         label = "清醒试炼 PIN",
                         status = if (hasPin) "已设置" else "未设置",

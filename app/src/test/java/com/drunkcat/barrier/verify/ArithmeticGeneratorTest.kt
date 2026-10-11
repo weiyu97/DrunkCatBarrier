@@ -59,4 +59,33 @@ class ArithmeticGeneratorTest {
         val c = ArithmeticGenerator.generate(5)
         assertEquals(5, c.problems.size)
     }
+
+    @Test
+    fun `all operands are single digit`() {
+        // 加/减/乘的操作数都是个位数；
+        // 除法被除数是两位数（如 81÷9），除数是个位数。
+        repeat(200) { seed ->
+            val c = ArithmeticGenerator.generate(20, Random(seed))
+            c.problems.forEach { p ->
+                val nums = p.question.split(Regex("[^0-9]+"))
+                    .filter { it.isNotBlank() }
+                    .map { it.toInt() }
+                if (p.question.contains("÷")) {
+                    // 除法：除数（第二个数）必须是 1-9
+                    assertTrue(
+                        "除数 ${nums[1]} 应为个位数（题目 ${p.question}）",
+                        nums[1] in 1..9
+                    )
+                } else {
+                    // 加减乘：操作数都是个位数
+                    nums.forEach { n ->
+                        assertTrue(
+                            "操作数 $n 应为个位数（题目 ${p.question}）",
+                            n in 0..9
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

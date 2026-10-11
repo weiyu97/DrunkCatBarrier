@@ -3,12 +3,14 @@ package com.drunkcat.barrier.verify
 import kotlin.random.Random
 
 /**
- * 两位数加减乘除选择题生成器。
+ * 个位数加减乘除选择题生成器。
  *
- * - 加法：两位数 + 两位数
- * - 减法：两位数 - 一位数/两位数（保证非负）
- * - 乘法：两位数 × 一位数
- * - 除法：被除数 ÷ 除数（整除）
+ * 题目全部为个位数运算，避免难度过高：
+ * - 加法：个位 + 个位
+ * - 减法：个位 - 个位（保证非负）
+ * - 乘法：个位 × 个位
+ * - 除法：个位 ÷ 个位（整除）
+ *
  * 每题 4 选 1，选项包含常见错误干扰项。
  */
 object ArithmeticGenerator {
@@ -34,22 +36,22 @@ object ArithmeticGenerator {
     }
 
     private fun addition(random: Random): ArithmeticProblem {
-        val a = random.nextInt(10, 100)
-        val b = random.nextInt(10, 100)
+        val a = random.nextInt(1, 10)
+        val b = random.nextInt(1, 10)
         val ans = a + b
         return build("$a + $b", ans, random)
     }
 
     private fun subtraction(random: Random): ArithmeticProblem {
-        var a = random.nextInt(20, 100)
-        var b = random.nextInt(10, 100)
+        var a = random.nextInt(1, 10)
+        var b = random.nextInt(1, 10)
         if (a < b) { val t = a; a = b; b = t }
         val ans = a - b
         return build("$a - $b", ans, random)
     }
 
     private fun multiplication(random: Random): ArithmeticProblem {
-        val a = random.nextInt(10, 100)
+        val a = random.nextInt(2, 10)
         val b = random.nextInt(2, 10)
         val ans = a * b
         return build("$a × $b", ans, random)
@@ -57,7 +59,7 @@ object ArithmeticGenerator {
 
     private fun division(random: Random): ArithmeticProblem {
         val b = random.nextInt(2, 10)
-        val ans = random.nextInt(2, 20)
+        val ans = random.nextInt(2, 10)
         val a = b * ans
         return build("$a ÷ $b", ans, random)
     }
@@ -71,7 +73,7 @@ object ArithmeticGenerator {
         var guard = 0
         while (opts.size < 4 && guard < 60) {
             guard++
-            val delta = random.nextInt(1, 10)
+            val delta = random.nextInt(1, 6)
             val cand = if (random.nextBoolean()) correct + delta else correct - delta
             if (cand >= 0 && cand != correct) opts.add(cand)
         }

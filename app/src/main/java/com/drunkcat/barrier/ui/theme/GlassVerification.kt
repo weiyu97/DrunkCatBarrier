@@ -436,7 +436,7 @@ private fun GlassDotMemory(
                 text = if (phase == 0)
                     "记住以下 ${DotMemoryGenerator.LIT_COUNT} 个位置"
                 else
-                    "按顺序点击还原（已点 ${tapped.size} / ${challenge.pattern.size}）",
+                    "点击还原这些位置（已点 ${tapped.size} / ${challenge.pattern.size}）",
                 fontSize = 12.sp,
                 color = Glass.OnSurfaceVariant,
                 fontFamily = FontFamily.Serif
@@ -467,17 +467,23 @@ private fun GlassDotMemory(
                                     )
                                     .border(1.dp, Color(0x38AA82FF), CircleShape)
                                     .clickable(enabled = phase == 1) {
+                                        // 无序：点过的格子不能重复点
+                                        if (tapped.contains(cell)) return@clickable
                                         val next = tapped + cell
                                         tapped = next
                                         if (next.size == challenge.pattern.size) {
-                                            onFinished(next == challenge.pattern)
+                                            // 只比对集合是否一致，不看顺序
+                                            onFinished(
+                                                next.toSet() == challenge.pattern.toSet()
+                                            )
                                         }
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (isTapped && tapIdx >= 0) {
+                                if (isTapped) {
+                                    // 无序模式：只显示已点标记，不显示序号
                                     Text(
-                                        text = "${tapIdx + 1}",
+                                        text = "✓",
                                         color = Color.White,
                                         fontSize = 18.sp,
                                         fontFamily = FontFamily.Serif

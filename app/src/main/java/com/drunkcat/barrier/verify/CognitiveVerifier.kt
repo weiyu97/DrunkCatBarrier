@@ -48,8 +48,12 @@ class CognitiveVerifier(private val random: Random = Random.Default) {
         return ChoiceOutcome(passed, if (passed) "" else "答对不足 $need 题")
     }
 
+    /**
+     * 点阵验证：只比对点击的格子集合，不要求顺序。
+     * 只要点对全部目标格子即可通过。
+     */
     fun verifyDotMemory(challenge: Challenge.DotMemory, tapped: List<Int>): Boolean =
-        tapped == challenge.pattern
+        tapped.toSet() == challenge.pattern.toSet() && tapped.size == challenge.pattern.size
 
     fun cooldownFor(failureCount: Int): Long = CooldownPolicy.cooldownFor(failureCount)
 }

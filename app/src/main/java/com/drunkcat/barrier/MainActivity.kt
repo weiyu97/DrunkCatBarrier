@@ -764,9 +764,9 @@ private fun AppRoot(
             com.drunkcat.barrier.ui.theme.GlassCheckupScreen(
                 items = listOf(
                     com.drunkcat.barrier.ui.theme.CheckupItem(
-                        title = "无障碍服务",
-                        desc = if (a11yOn) "已开启，可检测前台应用"
-                        else "未开启，自动保护无法生效",
+                        title = "无障碍服务（核心）",
+                        desc = if (a11yOn) "已开启，可拦截被封印的应用"
+                        else "未开启，无法拦截应用",
                         ok = a11yOn,
                         critical = true,
                         action = { openAccessibilitySettings(context) }
@@ -859,9 +859,9 @@ private fun AppRoot(
                         }
                     ),
                     com.drunkcat.barrier.ui.theme.CheckupItem(
-                        title = "Device Owner 完整封印",
-                        desc = if (state.isDeviceOwner) "已激活，最强锁定能力"
-                        else "未激活，当前使用无障碍降级模式",
+                        title = "Device Owner（可选，最强）",
+                        desc = if (state.isDeviceOwner) "已激活，可锁定主用户全部应用"
+                        else "未激活。需无账户设备，普通用户不必开启",
                         ok = state.isDeviceOwner,
                         critical = false,
                         action = { showDeviceOwnerDialog = true }
