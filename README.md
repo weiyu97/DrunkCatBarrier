@@ -133,7 +133,7 @@ keytool -genkeypair -v -keystore release.jks -alias drunckat \
   -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-签名文件已在 `.gitignore` 中排除，不会提交；签名密码请放在同样被忽略的 `local.properties` 中（参见 `RELEASE_STORE_PASSWORD` / `RELEASE_KEY_PASSWORD` 字段），不要写入源码。
+签名文件已在 `.gitignore` 中排除，不会提交。
 
 ---
 
@@ -201,6 +201,12 @@ gradle :app:testDebugUnitTest
 - [ ] 白名单应用到 LockTask
 - [ ] 契约到期自动解锁
 - [ ] 真机 Device Owner 验证
+
+---
+
+## AI 辅助开发声明
+
+本项目由 AI 编程助手（DeepSeek Harness）在开发者指导下辅助完成：包括项目结构梳理、文档撰写与优化、可穿戴手环相关残留代码的清理、构建脚本修复，以及本仓库的初始化与发布。核心功能设计、业务逻辑与最终决策由开发者把控，AI 仅作为实现与校对工具。
 
 ---
 
