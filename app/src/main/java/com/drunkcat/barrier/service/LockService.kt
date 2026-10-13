@@ -22,6 +22,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * 前台服务：喝酒模式运行期间保持常驻。
@@ -47,14 +48,17 @@ class LockService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification("喝酒模式已开启"))
+        startForeground(NOTIFICATION_ID, buildNotification(now = System.currentTimeMillis()))
         // 保护开启期间记录轨迹
         recorder.start()
         scope.launch {
             while (true) {
-                delay(MONITOR_INTERVAL_MS)
+                delay(REFRESH_NOTIFICATION_MS)
                 checkStatus()
-                checkExpiry()
+                val expired = checkExpiry()
+                if (expired) break
+                // 刷新常驻通知（剩余时间 / 风险分）
+                refreshNotification()
             }
         }
         return START_STICKY
@@ -62,12 +66,12 @@ class LockService : Service() {
 
     /**
      * 检查契约是否到期。
-     * 到期则自动解除保护并停止服务。
+     * @return true 表示已到期、服务即将停止
      */
-    private suspend fun checkExpiry() {
+    private suspend fun checkExpiry(): Boolean {
         val until = prefs.getProtectionUntil()
-        if (until <= 0L) return
-        if (System.currentTimeMillis() < until) return
+        if (until <= 0L) return false
+        if (System.currentTimeMillis() < until) return false
 
         // 到期：解除保护
         prefs.setProtectionActive(false)
@@ -76,6 +80,7 @@ class LockService : Service() {
         com.drunkcat.barrier.risk.RiskMonitor.reset()
         // 停止服务
         stopSelf()
+        return true
     }
 
     private suspend fun checkStatus() {
@@ -101,24 +106,59 @@ class LockService : Service() {
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "喝酒模式运行状态"
+                setShowBadge(false)
             }
             nm.createNotificationChannel(channel)
         }
     }
 
-    private fun buildNotification(text: String): Notification {
+    /** 刷新常驻通知：剩余时间 + 当前风险分 + 步数/心率（有手环时） */
+    private fun refreshNotification() {
+        val nm = getSystemService(NotificationManager::class.java)
+        val n = buildNotification(now = System.currentTimeMillis())
+        nm.notify(NOTIFICATION_ID, n)
+    }
+
+    private fun buildNotification(now: Long): Notification {
         val pi = PendingIntent.getActivity(
             this,
             0,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+
+        val until = runBlocking { prefs.getProtectionUntil() }
+        val riskScore = com.drunkcat.barrier.risk.RiskMonitor.currentScore(now)
+        val riskColor = when {
+            riskScore >= 60 -> "🔴"
+            riskScore >= 40 -> "🟡"
+            riskScore > 0 -> "🟢"
+            else -> "⚪"
+        }
+
+        val whenText = if (until > 0L) {
+            val remainMs = (until - now).coerceAtLeast(0L)
+            val h = remainMs / 3600_000L
+            val m = (remainMs % 3600_000L) / 60_000L
+            "剩余 ${h}h ${m}m 自动解除"
+        } else {
+            "手动解除"
+        }
+
+        val content = buildString {
+            append(riskColor).append(" 风险分 ").append(riskScore).append(" / 100")
+            append("\n").append(whenText)
+        }
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("醉猫结界")
-            .setContentText(text)
+            .setContentTitle("结界守护中")
+            .setContentText(content)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
             .setSmallIcon(R.drawable.ic_notification)
             .setOngoing(true)
             .setContentIntent(pi)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
             .build()
     }
 
@@ -129,6 +169,7 @@ class LockService : Service() {
             .setContentText(message)
             .setSmallIcon(R.drawable.ic_notification)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
             .build()
         nm.notify(WARNING_ID, n)
     }
@@ -138,6 +179,9 @@ class LockService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         recorder.stop()
+        // 清除常驻通知（防止服务被系统杀后通知残留）
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.cancel(NOTIFICATION_ID)
         scope.cancel()
     }
 
@@ -145,7 +189,7 @@ class LockService : Service() {
         private const val CHANNEL_ID = "drunckat_lock"
         private const val NOTIFICATION_ID = 1001
         private const val WARNING_ID = 1002
-        private const val MONITOR_INTERVAL_MS = 15 * 60 * 1000L
+        private const val REFRESH_NOTIFICATION_MS = 30 * 1000L  // 30 秒刷一次
 
         fun start(context: Context) {
             val i = Intent(context, LockService::class.java)

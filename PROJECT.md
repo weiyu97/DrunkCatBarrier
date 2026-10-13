@@ -59,8 +59,8 @@ iOS 有 SafeDrunk、Drunk Lock 等，核心为「预设锁定 + 数学验证」�
 |---|---|
 | 语言 | Kotlin |
 | UI | Jetpack Compose + Material 3 |
-| 最低版本 | Android 7.0（API 24） |
-| 目标版本 | Android 14（API 34） |
+| 最低版本 | Android 8.0（API 26） |
+| 目标版本 | Android 15（API 35） |
 | 存储 | DataStore（偏好）+ JSON Lines（轨迹/日志） |
 | 定位 | 系统 LocationManager（不依赖 Google Play 服务） |
 | 可穿戴 | 标准 BLE 心率服务（0x180D），兼容多品牌 |
@@ -294,27 +294,60 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 ### 12.1 环境
 
 - JDK 17
-- Gradle 8.2
-- Android SDK（build-tools 34，platform 34）
+- Gradle 8.7
+- Android SDK（build-tools 35，platform 35）
 
-### 12.2 命令
+### 12.2 统一签名（重要）
+
+本项目 **debug 和 release 共用同一份 release.jks 签名**，避免以下问题：
+
+- 手机上已装 debug 包，换 release 包时签名不匹配导致必须先卸载（丢数据）
+- 调试时看到的行为和发布包不一致
+
+**签名文件约定**：
+
+| 项 | 值 |
+|---|---|
+| 文件路径 | 项目根目录 `release.jks` |
+| 已被 `.gitignore` 排除 | ✅ （绝不提交） |
+| Key Store 密码 | `drunckat2026` |
+| Key Alias | `drunckat` |
+| Key 密码 | `drunckat2026` |
+
+**如果本地没有 `release.jks`**，会自动回退到 Android 默认 debug 签名——此时 debug 构建能跑，但装不上已用 release 签名的旧包。
+
+**生成新签名文件（仅首次）**：
+\`\`\`
+keytool -genkeypair -v \
+  -keystore release.jks \
+  -alias drunckat \
+  -keyalg RSA -keysize 2048 -validity 3650 \
+  -storepass drunckat2026 -keypass drunckat2026
+\`\`\`
+
+### 12.3 命令
 
 \`\`\`
-gradle :app:assembleDebug      # 构建 debug
-gradle :app:assembleRelease    # 构建 release（需 release.jks）
-gradle :app:testDebugUnitTest  # 运行单测（52 个）
-adb install -r app-debug.apk   # 安装
+# 构建（debug / release 都用统一签名，包名相同）
+gradle :app:assembleDebug       # 输出 app/build/outputs/apk/debug/app-debug.apk
+gradle :app:assembleRelease     # 输出 app/build/outputs/apk/release/app-release.apk
+
+# 一键安装到已连接手机（debug 包，覆盖安装无需卸载）
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# 运行单测
+gradle :app:testDebugUnitTest
 \`\`\`
 
-Release APK 约 8.45 MB，已启用 R8 混淆与资源压缩。
+Release APK 约 8.45 MB，已关闭 R8 混淆（避免 Compose 动画丢失）。
 
-### 12.3 Device Owner 激活
+### 12.4 Device Owner 激活
 
 \`\`\`
 adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 \`\`\`
 
-### 12.4 无障碍开启
+### 12.5 无障碍开启
 
 设置 → 无障碍 → 醉猫结界 → 开启
 或：\`adb shell settings put secure enabled_accessibility_services com.drunkcat.barrier/.service.AppWatchService\`

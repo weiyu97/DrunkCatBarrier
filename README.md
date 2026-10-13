@@ -59,7 +59,7 @@
 
 - **语言**：Kotlin
 - **UI**：Jetpack Compose + Material 3
-- **最低版本**：Android 7.0（API 24）
+- **最低版本**：Android 8.0（API 26）
 - **存储**：DataStore（偏好）+ JSON Lines（轨迹/日志）
 - **定位**：系统 LocationManager（不依赖 Google Play 服务）
 - **可穿戴**：标准 BLE 心率服务（0x180D），兼容小米/华为/Amazfit/佳明等
@@ -113,8 +113,8 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 ### 环境
 
 - JDK 17
-- Android SDK（build-tools 34，platform 34）
-- Gradle 8.2
+- Android SDK（build-tools 35，platform 35）
+- Gradle 8.7
 
 ### 命令
 

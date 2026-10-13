@@ -1,8 +1,11 @@
 package com.drunkcat.barrier.ui
 
 import android.app.Activity
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.WindowManager
+import android.window.OnBackInvokedDispatcher
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -19,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -32,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drunkcat.barrier.data.ContractTime
 import com.drunkcat.barrier.data.Prefs
+import com.drunkcat.barrier.report.InterceptLog
 import com.drunkcat.barrier.service.AppWatchService
 import com.drunkcat.barrier.ui.theme.CardTitle
 import com.drunkcat.barrier.ui.theme.DrunkCatTheme
@@ -41,8 +46,14 @@ import com.drunkcat.barrier.ui.theme.GlassPrimaryButton
 import com.drunkcat.barrier.ui.theme.GlassSecondaryButton
 import com.drunkcat.barrier.ui.theme.MagicCircle
 import com.drunkcat.barrier.ui.theme.ThemeMode
+import com.drunkcat.barrier.ui.theme.GlassFailureScreen
+import com.drunkcat.barrier.ui.theme.GlassVerificationFlow
 import com.drunkcat.barrier.verify.CognitiveVerifier
+import com.drunkcat.barrier.verify.VerifyDifficulty
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 酒后锁屏界面。
@@ -57,20 +68,66 @@ import kotlinx.coroutines.delay
  */
 class LockScreenActivity : ComponentActivity() {
 
+    /** 是否已通过验证；未通过就关闭时必须把结界遮罩还回来 */
+    private var unlocked = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 必须声明可在系统锁屏之上显示，否则从结界遮罩点击进入时，
+        // Activity 会因 canShowWhenLocked=false 被 keyguard 挡在身后不渲染（表现为"点了没反应"）。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
+        val attempted = intent.getStringExtra(EXTRA_ATTEMPTED_PACKAGE) ?: ""
+        // 拦截系统返回手势（Android 13+）：返回手势走 OnBackInvokedCallback，
+        // 旧的 onBackPressed / onKeyDown(BACK) 已无法拦截，会导致锁屏被一滑即关。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT
+            ) {
+                // 消费返回手势，必须通过验证或紧急呼叫才能离开
+            }
+        }
         setContent {
             DrunkCatTheme(mode = ThemeMode.GLASS) {
                 LockScreenContent(
-                    onUnlock = { finish() },
+                    attemptedPackage = attempted,
+                    onUnlock = {
+                        // 验证通过：撤掉可能存在的悬浮锁屏层，再关闭 Activity
+                        unlocked = true
+                        AppWatchService.dismissOverlay()
+                        finish()
+                    },
                     onEmergency = {
+                        // 先开临时放行窗，避免锁屏反复拦截拨号界面
+                        AppWatchService.grantEmergencyAccess(60_000L)
                         try {
                             startActivity(
                                 android.content.Intent(android.content.Intent.ACTION_DIAL).apply {
                                     data = android.net.Uri.parse("tel:110")
+                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
                             )
                         } catch (e: Exception) { }
+                    },
+                    onEmergencyBypass = {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            InterceptLog.logEmergencyBypass(this@LockScreenActivity)
+                        }
+                        AppWatchService.grantTempAccess(
+                            attempted,
+                            5 * 60 * 1000L,
+                            2 * 60 * 1000L
+                        )
+                        unlocked = true
+                        AppWatchService.dismissOverlay()
+                        finish()
                     }
                 )
             }
@@ -83,16 +140,75 @@ class LockScreenActivity : ComponentActivity() {
         // 不响应返回，必须通过验证或紧急呼叫离开
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        // 未解锁就被关掉（被系统回收、手势关掉等）→ 把结界遮罩还回来，避免结界被绕过
+        if (!unlocked) AppWatchService.restoreOverlay()
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // 拦截返回键（部分设备走此路径）
         if (keyCode == KeyEvent.KEYCODE_BACK) return true
         return super.onKeyDown(keyCode, event)
     }
+
+    companion object {
+        const val EXTRA_ATTEMPTED_PACKAGE = "attempted_package"
+    }
 }
 
 @Composable
-private fun LockScreenContent(
+internal fun LockScreenContent(
+    attemptedPackage: String,
     onUnlock: () -> Unit,
+    onEmergency: () -> Unit,
+    onEmergencyBypass: () -> Unit
+) {
+    var mode by remember { mutableStateOf("lock") }
+    var failReason by remember { mutableStateOf("") }
+
+    when (mode) {
+        "verify" -> {
+            GlassVerificationFlow(
+                verifier = CognitiveVerifier(),
+                difficulty = VerifyDifficulty.NORMAL,
+                onResult = { passed, reason ->
+                    if (passed) {
+                        // 给予被尝试应用临时使用窗口，再解除锁屏
+                        AppWatchService.grantTempAccess(
+                            attemptedPackage,
+                            5 * 60 * 1000L,
+                            2 * 60 * 1000L
+                        )
+                        onUnlock()
+                    } else {
+                        failReason = reason
+                        mode = "fail"
+                    }
+                }
+            )
+        }
+        "fail" -> {
+            GlassFailureScreen(
+                reason = failReason,
+                failureCount = 0,
+                cooldownMs = 0,
+                onDismiss = { mode = "lock" },
+                onEmergencyBypass = onEmergencyBypass
+            )
+        }
+        else -> {
+            LockScreenBody(
+                onVerify = { mode = "verify" },
+                onEmergency = onEmergency
+            )
+        }
+    }
+}
+
+@Composable
+private fun LockScreenBody(
+    onVerify: () -> Unit,
     onEmergency: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -185,17 +301,7 @@ private fun LockScreenContent(
 
                 GlassPrimaryButton(
                     text = "通过清醒验证解除",
-                    onClick = {
-                        // 转交给 VerifyActivity 处理，通过后关闭锁屏
-                        try {
-                            context.startActivity(
-                                android.content.Intent(context, VerifyActivity::class.java).apply {
-                                    putExtra(VerifyActivity.EXTRA_TARGET_PACKAGE, "")
-                                }
-                            )
-                        } catch (e: Exception) { }
-                        onUnlock()
-                    }
+                    onClick = onVerify
                 )
 
                 Spacer(Modifier.height(9.dp))

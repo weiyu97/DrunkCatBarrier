@@ -93,7 +93,7 @@ class Prefs(private val context: Context) {
     }
 
     suspend fun getProtectionLevel(): String =
-        context.dataStore.data.first()[Keys.PROTECTION_LEVEL] ?: ProtectionLevel.L1.name
+        context.dataStore.data.first()[Keys.PROTECTION_LEVEL] ?: ProtectionLevel.STANDARD.name
 
     // ---------- 主题 ----------
 
@@ -198,5 +198,4 @@ class Prefs(private val context: Context) {
 }
 
 enum class ContractMode { QUICK, FULL }
-
-enum class ProtectionLevel { L1, L2, L3 }
+// ProtectionLevel 已移至独立文件 ProtectionLevel.kt

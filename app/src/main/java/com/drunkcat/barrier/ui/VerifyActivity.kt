@@ -2,6 +2,7 @@ package com.drunkcat.barrier.ui
 
 import android.app.Activity
 import android.os.Bundle
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -40,6 +41,7 @@ import com.drunkcat.barrier.ui.theme.GlassPrimaryButton
 import com.drunkcat.barrier.ui.theme.GlassVerificationFlow
 import com.drunkcat.barrier.ui.theme.ThemeMode
 import com.drunkcat.barrier.verify.CognitiveVerifier
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 /**
@@ -53,6 +55,18 @@ class VerifyActivity : ComponentActivity() {
 
     private lateinit var prefs: Prefs
     private lateinit var log: InterceptLog
+
+    /** 拦截返回键：试炼未完成不允许退出，防止返回后直接回到被锁应用 */
+    @Deprecated("Deprecated in API 33")
+    override fun onBackPressed() {
+        // 不响应返回。出口只有两个：验证通过，或失败页的「回到桌面」
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // 拦截返回键（部分设备走此路径）
+        if (keyCode == KeyEvent.KEYCODE_BACK) return true
+        return super.onKeyDown(keyCode, event)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -136,6 +150,24 @@ class VerifyActivity : ComponentActivity() {
                                                             addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                                         }
                                                         startActivity(home)
+                                                        finish()
+                                                    },
+                                                    onEmergencyBypass = {
+                                                        // 记录紧急绕过事件
+                                                        MainScope().launch {
+                                                            InterceptLog.logEmergencyBypass(this@VerifyActivity)
+                                                        }
+                                                        // 放行目标应用 + 短暂全局放行
+                                                        AppWatchService.grantTempAccess(
+                                                            targetPkg,
+                                                            5 * 60 * 1000L,
+                                                            2 * 60 * 1000L
+                                                        )
+                                                        Toast.makeText(
+                                                            this@VerifyActivity,
+                                                            "紧急放行，已记入复盘",
+                                                            Toast.LENGTH_LONG
+                                                        ).show()
                                                         finish()
                                                     }
                                                 )

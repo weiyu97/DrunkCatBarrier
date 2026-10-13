@@ -5,16 +5,16 @@ import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import com.drunkcat.barrier.data.Prefs
 import com.drunkcat.barrier.risk.RiskMonitor
-import com.drunkcat.barrier.risk.HeartRateMonitor
 import com.drunkcat.barrier.risk.ShakeDetector
 import com.drunkcat.barrier.risk.TypingAnalyzer
-import com.drunkcat.barrier.ui.VerifyActivity
+import com.drunkcat.barrier.ui.LockOverlay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * 前台应用监听服务。
@@ -32,7 +32,6 @@ class AppWatchService : AccessibilityService() {
     private lateinit var prefs: Prefs
 
     private var shakeDetector: ShakeDetector? = null
-    private var heartRateMonitor: HeartRateMonitor? = null
     private val typingAnalyzer = TypingAnalyzer()
 
     private var lockedPackages: Set<String> = emptySet()
@@ -41,6 +40,7 @@ class AppWatchService : AccessibilityService() {
     private var autoProtectEnabled = true
     @Volatile private var cooldownUntilCache: Long = 0L
     @Volatile private var skipAutoUntil: Long = 0L
+    @Volatile private var protectionUntilCache: Long = 0L
 
     // 已验证通过、处于临时窗口期的应用
     @Volatile private var tempAllowedPackage: String? = null
@@ -48,6 +48,9 @@ class AppWatchService : AccessibilityService() {
 
     // 全局放行：一次验证通过后，短时间内所有被锁应用免验证
     @Volatile private var globalAllowUntil: Long = 0L
+
+    // 紧急呼叫后的全局临时放行窗口（避免锁屏反复拦截拨号界面）
+    @Volatile private var emergencyUntil: Long = 0L
 
     // 防抖：同一应用短时间内不重复弹窗
     @Volatile private var lastBlockedPackage: String? = null
@@ -58,6 +61,7 @@ class AppWatchService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        android.util.Log.d("DrunkCat", "onServiceConnected: bound OK")
         prefs = Prefs(this)
         scope.launch {
             prefs.lockedFlow().collect { lockedPackages = it.toSet() }
@@ -67,6 +71,9 @@ class AppWatchService : AccessibilityService() {
         }
         scope.launch {
             prefs.protectionFlow.collect { protectionActive = it }
+        }
+        scope.launch {
+            prefs.protectionUntilFlow.collect { protectionUntilCache = it }
         }
         scope.launch {
             prefs.autoProtectFlow.collect { autoProtectEnabled = it }
@@ -81,8 +88,6 @@ class AppWatchService : AccessibilityService() {
         }
         // 启动步态检测
         shakeDetector = ShakeDetector(this).also { it.start() }
-        // 启动心率监测（若已授权蓝牙）
-        heartRateMonitor = HeartRateMonitor(this).also { it.start() }
         // 定期刷新时间信号并检查风险
         scope.launch {
             while (true) {
@@ -127,42 +132,39 @@ class AppWatchService : AccessibilityService() {
         RiskMonitor.onAppSwitched(pkg)
         maybeAutoTrigger()
 
+        android.util.Log.d(
+            "DrunkCat",
+            "watch: pkg=$pkg active=$protectionActive locked=${lockedPackages.size} wl=${whitelistPackages.size}"
+        )
+
         // ---- 2. 拦截逻辑（仅保护开启时）----
-        if (!protectionActive) return
+        // 结界守护：保护开启后，只要前台不是本应用（且非白名单/临时放行），
+        // 就把软锁屏拉回前台，把用户锁在结界内。
+        if (!protectionActive) {
+            // 保护已关闭，确保残留的悬浮锁屏层被撤掉
+            if (LockOverlay.isShowing()) LockOverlay.remove(this)
+            return
+        }
+        // 白名单应用允许自由使用
         if (pkg in whitelistPackages) return
-        if (pkg !in lockedPackages) return
 
         val now = System.currentTimeMillis()
         // 全局放行期内直接通过
         if (now < globalAllowUntil) return
         if (pkg == tempAllowedPackage && now < tempAllowUntil) return
+        // 紧急呼叫后的临时放行窗口
+        if (now < emergencyUntil) return
+        // 防抖：同一包名短时间内不重复拉起锁屏
         if (pkg == lastBlockedPackage && now - lastBlockedAt < 1500) return
-
-        // 冷却期内直接拦截，不弹验证页
-        val cooldownUntil = cooldownUntilCache
-        if (now < cooldownUntil) {
-            // 弹回桌面
-            val home = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_HOME)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            startActivity(home)
-            return
-        }
 
         lastBlockedPackage = pkg
         lastBlockedAt = now
 
-        // 弹出验证界面
-        val intent = Intent(this, VerifyActivity::class.java).apply {
-            addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK
-                        or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
-            )
-            putExtra(VerifyActivity.EXTRA_TARGET_PACKAGE, pkg)
-        }
-        startActivity(intent)
+        // 拉起悬浮锁屏层（结界封锁中），把用户锁回结界。
+        // 用 TYPE_ACCESSIBILITY_OVERLAY 绘制，不受 MIUI 后台弹窗限制，
+        // 且无法被返回手势关闭。
+        android.util.Log.d("DrunkCat", "watch: LOCKSCREEN for $pkg")
+        LockOverlay.show(this, pkg, protectionUntilCache)
     }
 
     /**
@@ -170,6 +172,8 @@ class AppWatchService : AccessibilityService() {
      *
      * 预警期间用户可点「我没醉」取消；
      * 30 秒无操作则自动开启保护。
+     *
+     * 阈值由 ProtectionLevel 三档决定（LITE=99, STANDARD=60, STRICT=40）。
      */
     private fun maybeAutoTrigger() {
         if (!autoProtectEnabled) return
@@ -182,7 +186,13 @@ class AppWatchService : AccessibilityService() {
         // 5 分钟内不重复触发
         if (now - lastAutoTriggerAt < 5 * 60 * 1000L) return
 
-        if (RiskMonitor.shouldTrigger(now)) {
+        // 读取保护级别，决定触发阈值
+        val levelName = runBlocking { runCatching { prefs.getProtectionLevel() }.getOrDefault("STANDARD") }
+        val threshold = runCatching {
+            com.drunkcat.barrier.data.ProtectionLevel.valueOf(levelName).threshold
+        }.getOrDefault(60)
+
+        if (RiskMonitor.shouldTrigger(now, threshold)) {
             lastAutoTriggerAt = now
 
             // 进入预警状态
@@ -195,6 +205,7 @@ class AppWatchService : AccessibilityService() {
                 scope.launch {
                     // 若用户从未配置锁定名单，套用默认清单，
                     // 避免「保护中却拦不住任何东西」
+                    var defaultAppliedCount = 0
                     val current = prefs.getLockedPackages()
                     if (current.isEmpty()) {
                         val installed = queryInstalledPackages()
@@ -202,6 +213,7 @@ class AppWatchService : AccessibilityService() {
                             .pickDefault(installed)
                         if (defaults.isNotEmpty()) {
                             prefs.setLockedPackages(defaults)
+                            defaultAppliedCount = defaults.size
                         }
                     }
                     prefs.setProtectionActive(true)
@@ -209,7 +221,7 @@ class AppWatchService : AccessibilityService() {
                     prefs.setProtectionUntil(
                         com.drunkcat.barrier.data.ContractTime.nextMorning8()
                     )
-                    AutoProtectionNotifier.notify(this@AppWatchService)
+                    AutoProtectionNotifier.notify(this@AppWatchService, defaultAppliedCount)
                 }
             }
 
@@ -234,18 +246,10 @@ class AppWatchService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         shakeDetector?.stop()
-        heartRateMonitor?.stop()
         scope.cancel()
     }
 
     companion object {
-        /** 最近一次心率读数（0 表示无数据） */
-        val currentHeartRate: Int
-            get() = instance?.heartRateMonitor?.lastHeartRate ?: 0
-
-        /** 心率手环是否已连接 */
-        val heartRateConnected: Boolean
-            get() = instance?.heartRateMonitor?.isConnected() == true
 
         /**
          * 验证通过后给予临时使用权限。
@@ -263,6 +267,30 @@ class AppWatchService : AccessibilityService() {
                     it.globalAllowUntil = now + globalMs
                 }
             }
+        }
+
+        /**
+         * 紧急呼叫时调用：开启一段全局临时放行，
+         * 避免软锁屏反复拦截拨号界面导致无法拨出。
+         */
+        fun grantEmergencyAccess(durationMs: Long = 60_000L) {
+            instance?.let { it.emergencyUntil = System.currentTimeMillis() + durationMs }
+        }
+
+        /** 关闭悬浮锁屏层（保护停止 / 验证通过时调用），并作废挂起状态，之后不再恢复 */
+        fun dismissOverlay() {
+            instance?.let { LockOverlay.remove(it) }
+            LockOverlay.clearPending()
+        }
+
+        /**
+         * 恢复悬浮锁屏层。验证 Activity 关闭但并未解锁时调用，
+         * 需要服务实例提供无障碍上下文。
+         */
+        fun restoreOverlay() {
+            val s = instance ?: return
+            if (!s.protectionActive) return
+            LockOverlay.restore(s)
         }
 
         @Volatile private var instance: AppWatchService? = null

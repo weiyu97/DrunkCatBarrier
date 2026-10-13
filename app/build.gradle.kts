@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.drunkcat.barrier"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.drunkcat.barrier"
-        minSdk = 24
-        targetSdk = 34
+        minSdk = 26
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -18,13 +18,32 @@ android {
 
     signingConfigs {
         create("release") {
-            // 签名文件放在项目根目录，通过 .gitignore 排除
+            // 统一签名文件：debug / release 都用同一份，避免卸载重装签名冲突。
+            // release.jks 与密码均不入库：
+            //   - release.jks 已由 .gitignore 排除
+            //   - 密码从 local.properties（已被 .gitignore 排除）或环境变量读取，
+            //     例如在 local.properties 中追加：
+            //       RELEASE_STORE_PASSWORD=你的密码
+            //       RELEASE_KEY_PASSWORD=你的密码
+            //       RELEASE_KEY_ALIAS=drunckat
             val ksFile = rootProject.file("release.jks")
             if (ksFile.exists()) {
-                storeFile = ksFile
-                storePassword = "drunckat2026"
-                keyAlias = "drunckat"
-                keyPassword = "drunckat2026"
+                val props = java.util.Properties().apply {
+                    val lp = rootProject.file("local.properties")
+                    if (lp.exists()) lp.inputStream().use { load(it) }
+                }
+                val ksPass = props.getProperty("RELEASE_STORE_PASSWORD")
+                    ?: System.getenv("RELEASE_STORE_PASSWORD")
+                val keyPass = props.getProperty("RELEASE_KEY_PASSWORD")
+                    ?: System.getenv("RELEASE_KEY_PASSWORD")
+                val alias = props.getProperty("RELEASE_KEY_ALIAS")
+                    ?: System.getenv("RELEASE_KEY_ALIAS") ?: "drunckat"
+                if (ksPass != null && keyPass != null) {
+                    storeFile = ksFile
+                    storePassword = ksPass
+                    keyAlias = alias
+                    keyPassword = keyPass
+                }
             }
         }
     }
@@ -41,7 +60,14 @@ android {
             }
         }
         debug {
-            applicationIdSuffix = ".debug"
+            // debug 也用统一签名，避免安装同包名 release 包时签名不一致导致卸载。
+            // 注意：保留 applicationIdSuffix = ".debug" 会变成
+            // com.drunkcat.barrier.debug，和 release 的包名不同，
+            // 也就不能覆盖安装——这里去掉后缀，让两个构建输出同包名。
+            val ksFile = rootProject.file("release.jks")
+            if (ksFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
@@ -66,6 +92,7 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))

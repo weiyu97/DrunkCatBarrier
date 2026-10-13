@@ -75,15 +75,6 @@ object RiskMonitor {
     }
 
     /**
-     * 记录一次心率异常信号。
-     */
-    fun onHeartRateAnomaly(detail: String, now: Long = System.currentTimeMillis()) {
-        synchronized(lock) {
-            addHit(RiskSignal.HEART_RATE_ANOMALY, now, detail)
-        }
-    }
-
-    /**
      * 获取当前风险分。
      */
     fun currentScore(now: Long = System.currentTimeMillis()): Int {
@@ -94,10 +85,32 @@ object RiskMonitor {
 
     /**
      * 是否应触发保护。
+     *
+     * @param threshold 触发阈值（分）。默认 60；可通过 ProtectionLevel 三档配置。
      */
-    fun shouldTrigger(now: Long = System.currentTimeMillis()): Boolean {
+    fun shouldTrigger(now: Long = System.currentTimeMillis(), threshold: Int = RiskScorer.THRESHOLD): Boolean {
         synchronized(lock) {
-            return RiskScorer.shouldTrigger(hits.toList(), now)
+            val score = RiskScorer.score(hits.toList(), now)
+            return score >= threshold
+        }
+    }
+
+    /**
+     * 获取当前所有活跃的信号（供复盘页展示）。
+     * 返回快照，不随内部状态变化。
+     */
+    fun snapshot(): List<SignalHit> {
+        synchronized(lock) {
+            return hits.toList()
+        }
+    }
+
+    /**
+     * 获取某类信号的最新一条（供复盘页按类型查询）。
+     */
+    fun latest(signal: RiskSignal): SignalHit? {
+        synchronized(lock) {
+            return hits.firstOrNull { it.signal == signal }
         }
     }
 

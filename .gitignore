@@ -35,3 +35,4 @@ ui*.xml
 pkg.txt
 acts.txt
 wrapper.log
+_tmp_*.png

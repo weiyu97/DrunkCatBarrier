@@ -163,11 +163,11 @@ fun GlassContractScreen(
                         if (text.isEmpty()) {
                             Text(
                                 text = if (mode == ContractMode.QUICK)
-                                    "输入「我确认」三个字……"
+                                "输入『我确认』三个字……"
                                 else
-                                    "逐字写下誓约……",
+                                fullText,
                                 fontSize = 12.sp,
-                                color = Color(0x59B4A0DC),
+                                color = Glass.OnBg,
                                 fontFamily = FontFamily.Serif
                             )
                         }

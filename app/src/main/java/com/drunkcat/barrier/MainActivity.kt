@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -298,22 +299,25 @@ private fun isAccessibilityEnabled(context: Context): Boolean {
     }
 
     // 方式 2：设置字符串
+    var rawVal = "<unread>"
     val bySettings = try {
         val raw = android.provider.Settings.Secure.getString(
             context.contentResolver,
             android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
         )
+        rawVal = raw ?: "<null>"
         raw != null && raw != "null" && raw.split(":").any {
             it.contains(context.packageName) && it.contains("AppWatchService")
         }
     } catch (e: Exception) {
+        rawVal = "<ex:${e.message}>"
         false
     }
 
     val hit = byManager || bySettings
     android.util.Log.d(
         "DrunkCat",
-        "a11y: pkg=${context.packageName} byManager=$byManager bySettings=$bySettings hit=$hit"
+        "a11y: pkg=${context.packageName} byManager=$byManager bySettings=$bySettings hit=$hit raw=[$rawVal]"
     )
     return hit
 }
@@ -336,15 +340,15 @@ private fun AppRoot(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { }
 
-    // 体检页：蓝牙权限请求器（心率手环）
-    val bluetoothPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { }
-
     // 体检页：Device Owner 说明对话框
     var showDeviceOwnerDialog by remember { mutableStateOf(false) }
 
     var screen by remember { mutableStateOf(initialScreenState.value ?: Screen.HOME) }
+
+    // 系统返回键：二级页统一回首页，不直接退出应用
+    BackHandler(enabled = screen != Screen.HOME) {
+        screen = Screen.HOME
+    }
 
     // 快捷方式切换页面时同步
     LaunchedEffect(initialScreenState.value) {
@@ -360,6 +364,7 @@ private fun AppRoot(
     var pin by remember { mutableStateOf<String?>(null) }
     var contractMode by remember { mutableStateOf(ContractMode.QUICK) }
     var protectionActive by remember { mutableStateOf(false) }
+    var protectionLevel by remember { mutableStateOf("STANDARD") }
     var autoProtectEnabled by remember { mutableStateOf(true) }
     var autoSkipped by remember { mutableStateOf(false) }
     var onboardingDone by remember { mutableStateOf<Boolean?>(null) }
@@ -381,6 +386,7 @@ private fun AppRoot(
         protectionActive = try {
             prefs.protectionFlow.first()
         } catch (e: Exception) { false }
+        protectionLevel = try { prefs.getProtectionLevel() } catch (e: Exception) { "STANDARD" }
         autoProtectEnabled = try {
             prefs.autoProtectFlow.first()
         } catch (e: Exception) { true }
@@ -399,6 +405,7 @@ private fun AppRoot(
         scope.launch {
             prefs.setProtectionActive(false)
             protectionActive = false
+            com.drunkcat.barrier.service.AppWatchService.dismissOverlay()
             com.drunkcat.barrier.risk.RiskMonitor.reset()
             locked.forEach { manager.unhideApp(it) }
             manager.clearAllowedPackages()
@@ -555,7 +562,12 @@ private fun AppRoot(
                     onNavContract = startContract,
                     onNavTrial = { screen = Screen.VERIFICATION },
                     onNavReview = { screen = Screen.REVIEW },
-                    onOpenCheckup = { screen = Screen.CHECKUP }
+                    onOpenCheckup = { screen = Screen.CHECKUP },
+                    levelName = protectionLevel,
+                    onLevelChange = { newLevel ->
+                        protectionLevel = newLevel
+                        scope.launch { prefs.setProtectionLevel(newLevel) }
+                    }
                 )
             } else {
                 HomeScreen(
@@ -774,23 +786,13 @@ private fun AppRoot(
         }
 
         Screen.REVIEW -> {
-            GlassReviewScreen()
+            GlassReviewScreen(onBack = { screen = Screen.HOME })
         }
 
         Screen.CHECKUP -> {
             val health = com.drunkcat.barrier.service.HealthCheck.check(context)
             val a11yOn = isAccessibilityEnabled(context)
 
-            // 心率实时读取（体检页停留期间每秒刷新）
-            var hr by remember { mutableIntStateOf(0) }
-            var hrConnected by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) {
-                while (true) {
-                    hr = com.drunkcat.barrier.service.AppWatchService.currentHeartRate
-                    hrConnected = com.drunkcat.barrier.service.AppWatchService.heartRateConnected
-                    kotlinx.coroutines.delay(1000)
-                }
-            }
             com.drunkcat.barrier.ui.theme.GlassCheckupScreen(
                 items = listOf(
                     com.drunkcat.barrier.ui.theme.CheckupItem(
@@ -866,26 +868,6 @@ private fun AppRoot(
                                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 )
                             } catch (e: Exception) { }
-                        }
-                    ),
-                    com.drunkcat.barrier.ui.theme.CheckupItem(
-                        title = "心率手环",
-                        desc = when {
-                            hrConnected && hr > 0 -> "已连接，当前心率 $hr BPM"
-                            health.bluetoothOk -> "已授权。请在手环上开启心率广播，App 会自动连接"
-                            else -> "未授权，可选功能（用于心率辅助判断）"
-                        },
-                        ok = hrConnected && hr > 0,
-                        critical = false,
-                        action = {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                bluetoothPermissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.BLUETOOTH_SCAN,
-                                        Manifest.permission.BLUETOOTH_CONNECT
-                                    )
-                                )
-                            }
                         }
                     ),
                     com.drunkcat.barrier.ui.theme.CheckupItem(

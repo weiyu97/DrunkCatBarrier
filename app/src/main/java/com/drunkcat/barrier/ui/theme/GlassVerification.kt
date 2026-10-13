@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drunkcat.barrier.verify.Challenge
 import com.drunkcat.barrier.verify.CognitiveVerifier
+import com.drunkcat.barrier.service.AppWatchService
 import com.drunkcat.barrier.verify.DotMemoryGenerator
 import kotlinx.coroutines.delay
 import kotlin.random.Random
@@ -165,6 +166,8 @@ private fun EmergencyCallButton() {
             .border(1.dp, Color(0x66FF4678), RoundedCornerShape(12.dp))
             .clickable {
                 try {
+                    // 先开临时放行窗，避免锁屏反复拦截拨号界面
+                    AppWatchService.grantEmergencyAccess(60_000L)
                     val intent = android.content.Intent(
                         android.content.Intent.ACTION_DIAL
                     ).apply {

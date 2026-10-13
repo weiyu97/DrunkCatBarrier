@@ -40,6 +40,27 @@ class InterceptLog(private val context: Context) {
         }
     }
 
+    /** 紧急绕过事件的特殊包名，用于复盘识别 */
+    companion object {
+        const val EMERGENCY_BYPASS_PKG = "__EMERGENCY_BYPASS__"
+
+        /**
+         * 写入一条紧急绕过记录。
+         * 复盘时据此识别"用户跳过验证直接进入"的事件。
+         */
+        suspend fun logEmergencyBypass(context: Context) {
+            val log = InterceptLog(context)
+            log.append(
+                Entry(
+                    timestamp = System.currentTimeMillis(),
+                    packageName = EMERGENCY_BYPASS_PKG,
+                    passed = true,
+                    reason = "紧急跳过验证"
+                )
+            )
+        }
+    }
+
     private val dir: File
         get() = File(context.filesDir, "logs").apply { if (!exists()) mkdirs() }
 

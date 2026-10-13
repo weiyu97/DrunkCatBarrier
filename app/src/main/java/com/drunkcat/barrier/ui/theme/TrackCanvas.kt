@@ -29,6 +29,9 @@ fun TrackCanvas(
     points: List<TrackPoint>,
     modifier: Modifier = Modifier
 ) {
+    // ⚠️ 不用 return@Box 提前返回：Composable lambda 内的提前返回会破坏
+    // Composer 的组栈（group stack），数据加载触发重组时可能抛
+    // IndexOutOfBoundsException（Stack.pop 组栈下溢）导致闪退。
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -36,50 +39,48 @@ fun TrackCanvas(
             .clip(RoundedCornerShape(12.dp))
             .background(Color(0x33000000))
     ) {
-        if (points.size < 2) {
-            return@Box
-        }
+        if (points.size >= 2) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                val pad = 24f
 
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val pad = 24f
+                val normalized = TrackProjector.normalize(points)
 
-            val normalized = TrackProjector.normalize(points)
+                fun project(idx: Int): Offset {
+                    val n = normalized[idx]
+                    return Offset(
+                        x = pad + n.x * (w - pad * 2),
+                        y = pad + n.y * (h - pad * 2)
+                    )
+                }
 
-            fun project(idx: Int): Offset {
-                val n = normalized[idx]
-                return Offset(
-                    x = pad + n.x * (w - pad * 2),
-                    y = pad + n.y * (h - pad * 2)
+                // 连线
+                val path = Path().apply {
+                    val first = project(0)
+                    moveTo(first.x, first.y)
+                    for (i in 1 until points.size) {
+                        val o = project(i)
+                        lineTo(o.x, o.y)
+                    }
+                }
+                drawPath(
+                    path = path,
+                    color = Color(0xFFFF3D6E),
+                    style = Stroke(width = 3f)
                 )
-            }
 
-            // 连线
-            val path = Path().apply {
-                val first = project(0)
-                moveTo(first.x, first.y)
-                for (i in 1 until points.size) {
-                    val o = project(i)
-                    lineTo(o.x, o.y)
+                // 节点：起点绿、终点红、中间紫
+                points.indices.forEach { idx ->
+                    val o = project(idx)
+                    val color = when (idx) {
+                        0 -> Color(0xFF6DFFB0)
+                        points.lastIndex -> Color(0xFFFF3D6E)
+                        else -> Color(0xFFB08CFF)
+                    }
+                    val radius = if (idx == 0 || idx == points.lastIndex) 8f else 5f
+                    drawCircle(color = color, radius = radius, center = o)
                 }
-            }
-            drawPath(
-                path = path,
-                color = Color(0xFFFF3D6E),
-                style = Stroke(width = 3f)
-            )
-
-            // 节点：起点绿、终点红、中间紫
-            points.indices.forEach { idx ->
-                val o = project(idx)
-                val color = when (idx) {
-                    0 -> Color(0xFF6DFFB0)
-                    points.lastIndex -> Color(0xFFFF3D6E)
-                    else -> Color(0xFFB08CFF)
-                }
-                val radius = if (idx == 0 || idx == points.lastIndex) 8f else 5f
-                drawCircle(color = color, radius = radius, center = o)
             }
         }
     }

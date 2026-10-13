@@ -29,6 +29,10 @@ object WarningState {
     /** 预警到期自动锁定的回调 */
     @Volatile var onTimeout: (() -> Unit)? = null
 
+    /** 用户本轮 session 里是否点过「我没醉」（供首页横条显示） */
+    @Volatile var cancelledThisSession: Boolean = false
+        private set
+
     fun start(now: Long = System.currentTimeMillis()) {
         active = true
         startedAt = now
@@ -37,6 +41,7 @@ object WarningState {
 
     fun cancel() {
         active = false
+        cancelledThisSession = true
         onCancel?.invoke()
         onCancel = null
         onTimeout = null
