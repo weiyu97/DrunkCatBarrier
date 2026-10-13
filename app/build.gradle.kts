@@ -28,15 +28,23 @@ android {
             //       RELEASE_KEY_ALIAS=drunckat
             val ksFile = rootProject.file("release.jks")
             if (ksFile.exists()) {
-                val props = java.util.Properties().apply {
-                    val lp = rootProject.file("local.properties")
-                    if (lp.exists()) lp.inputStream().use { load(it) }
+                // 从 local.properties（已被 .gitignore 排除）解析签名密码；
+                // 不依赖 java.util.Properties，避免 Gradle Kotlin DSL 脚本类路径问题。
+                val localProps = rootProject.file("local.properties").let { lp ->
+                    if (lp.exists()) {
+                        lp.readLines()
+                            .map { it.substringBefore("#").trim() }
+                            .filter { it.contains("=") }
+                            .associate { it.substringBefore("=").trim() to it.substringAfter("=").trim() }
+                    } else {
+                        emptyMap()
+                    }
                 }
-                val ksPass = props.getProperty("RELEASE_STORE_PASSWORD")
+                val ksPass = localProps["RELEASE_STORE_PASSWORD"]
                     ?: System.getenv("RELEASE_STORE_PASSWORD")
-                val keyPass = props.getProperty("RELEASE_KEY_PASSWORD")
+                val keyPass = localProps["RELEASE_KEY_PASSWORD"]
                     ?: System.getenv("RELEASE_KEY_PASSWORD")
-                val alias = props.getProperty("RELEASE_KEY_ALIAS")
+                val alias = localProps["RELEASE_KEY_ALIAS"]
                     ?: System.getenv("RELEASE_KEY_ALIAS") ?: "drunckat"
                 if (ksPass != null && keyPass != null) {
                     storeFile = ksFile
