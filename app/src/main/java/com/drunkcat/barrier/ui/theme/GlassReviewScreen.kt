@@ -1,11 +1,5 @@
 package com.drunkcat.barrier.ui.theme
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -61,7 +55,6 @@ import java.util.Locale
  *
  * 展示：
  * - 统计卡片：拦截次数、通过次数、失败次数、高风险时段
- * - 生命信号：心率手环数据与风险关联说明
  * - 拦截时间线
  * - 轨迹（坐标 + 时间）
  *
@@ -443,50 +436,6 @@ fun GlassReviewScreen(
                 Spacer(Modifier.height(16.dp))
             }
         }
-    }
-}
-
-/**
- * 心率脉冲装饰（小红色心跳点，跟随真实 BPM 呼吸节奏）。
- */
-@Composable
-private fun HeartRatePulse(
-    bpm: Int,
-    modifier: Modifier = Modifier
-) {
-    // 根据 BPM 计算脉冲周期（毫秒），最低 500ms 防止过快
-    val pulseMs = (60_000L / bpm.coerceAtLeast(30)).coerceAtLeast(500L)
-    val transition = rememberInfiniteTransition(label = "hrPulse")
-    val scale by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = (pulseMs * 0.35).toInt(),
-                easing = LinearEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "hrScale"
-    )
-    Canvas(
-        modifier = modifier
-            .padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 4.dp)
-            .height(40.dp)
-    ) {
-        val cx = size.width / 2
-        val cy = size.height / 2
-        val r = (size.minDimension / 4) * scale
-        drawCircle(
-            color = Glass.Primary.copy(alpha = 0.9f),
-            radius = r,
-            center = Offset(cx, cy)
-        )
-        drawCircle(
-            color = Glass.Primary.copy(alpha = 0.3f),
-            radius = r * 1.6f,
-            center = Offset(cx, cy)
-        )
     }
 }
 

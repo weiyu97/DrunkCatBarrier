@@ -112,7 +112,7 @@ class LockService : Service() {
         }
     }
 
-    /** 刷新常驻通知：剩余时间 + 当前风险分 + 步数/心率（有手环时） */
+    /** 刷新常驻通知：剩余时间 + 当前风险分 */
     private fun refreshNotification() {
         val nm = getSystemService(NotificationManager::class.java)
         val n = buildNotification(now = System.currentTimeMillis())

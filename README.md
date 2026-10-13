@@ -23,12 +23,12 @@
 
 ## 核心机制
 
-\`\`\`
+```
 后台监测 → 风险分累积 → 超阈值 → 30秒预警
    → 用户无操作 → 自动上锁
    → 打开被锁App → 弹清醒验证
    → 通过 → 临时放行 / 失败 → 挡回
-\`\`\`
+```
 
 ### 风险信号（加权评分）
 
@@ -38,8 +38,8 @@
 | 10 分钟内切换应用 ≥15 次 | 25 |
 | 打开通讯录/短信/社交/支付类应用 | 20 |
 | 加速度计持续晃动 | 15 |
-| 手环心率持续偏高（弱信号） | 12 |
-| 突然活跃 | 10 |
+| 长时间无操作后突然活跃 | 10 |
+| 打字行为异常（删除率高） | 10 |
 
 总分 ≥ 60 → 进入 30 秒预警。
 
@@ -60,9 +60,9 @@
 - **语言**：Kotlin
 - **UI**：Jetpack Compose + Material 3
 - **最低版本**：Android 8.0（API 26）
+- **目标版本**：Android 15（API 35）
 - **存储**：DataStore（偏好）+ JSON Lines（轨迹/日志）
 - **定位**：系统 LocationManager（不依赖 Google Play 服务）
-- **可穿戴**：标准 BLE 心率服务（0x180D），兼容小米/华为/Amazfit/佳明等
 
 ---
 
@@ -95,9 +95,9 @@
 
 **前置条件**：设备无任何账户，无次要用户。适合备用机或新机。
 
-\`\`\`bash
+```bash
 adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
-\`\`\`
+```
 
 ### Profile Owner（特定场景）
 
@@ -118,61 +118,62 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 
 ### 命令
 
-\`\`\`bash
+```bash
 gradle :app:assembleDebug      # 构建 debug
 gradle :app:assembleRelease    # 构建 release（需 release.jks）
 gradle :app:testDebugUnitTest  # 运行单元测试
-\`\`\`
+```
 
 ### 签名
 
-Release 构建需在项目根目录放置 \`release.jks\`。生成方式：
+Release 构建需在项目根目录放置 `release.jks`。生成方式：
 
-\`\`\`bash
+```bash
 keytool -genkeypair -v -keystore release.jks -alias drunckat \
   -keyalg RSA -keysize 2048 -validity 10000
-\`\`\`
+```
 
-签名文件已在 \`.gitignore\` 中排除，不会提交。
+签名文件已在 `.gitignore` 中排除，不会提交；签名密码请放在同样被忽略的 `local.properties` 中（参见 `RELEASE_STORE_PASSWORD` / `RELEASE_KEY_PASSWORD` 字段），不要写入源码。
 
 ---
 
 ## 项目结构
 
-\`\`\`
+```
 com.drunkcat.barrier/
 ├── admin/        Device Owner 管理
 ├── data/         偏好存储、应用查询、白名单、默认锁定清单
-├── risk/         风险评分引擎（6 信号）+ 可穿戴抽象
+├── risk/         风险评分引擎（6 信号）
 ├── service/      无障碍监测、前台服务、预警、健康检查
 ├── track/        轨迹记录、逆地理编码、投影
 ├── report/       拦截日志
 ├── verify/       清醒验证（算术/成语/点阵）+ 难度分级
 └── ui/           界面（琉璃风 + 简约风双主题）
-\`\`\`
+```
 
 ---
 
 ## 测试
 
-67 个单元测试，全部通过：
+71 个单元测试，全部通过：
 
 | 测试类 | 用例 |
 |---|---|
 | ContractTimeTest | 11 |
 | RiskScorerTest | 10 |
-| HeartRateAnalyzerTest | 9 |
 | PermanentWhitelistTest | 8 |
 | DefaultLockListTest | 6 |
+| TypingAnalyzerTest | 6 |
 | TrackProjectorTest | 6 |
-| VerifyDifficultyTest | 6 |
-| ArithmeticGeneratorTest | 5 |
+| ArithmeticGeneratorTest | 6 |
+| DotMemoryVerifyTest | 6 |
 | IdiomGeneratorTest | 4 |
+| VerifyDifficultyTest | 6 |
 | CooldownPolicyTest | 2 |
 
-\`\`\`bash
+```bash
 gradle :app:testDebugUnitTest
-\`\`\`
+```
 
 ---
 

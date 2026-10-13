@@ -63,7 +63,6 @@ iOS 有 SafeDrunk、Drunk Lock 等，核心为「预设锁定 + 数学验证」�
 | 目标版本 | Android 15（API 35） |
 | 存储 | DataStore（偏好）+ JSON Lines（轨迹/日志） |
 | 定位 | 系统 LocationManager（不依赖 Google Play 服务） |
-| 可穿戴 | 标准 BLE 心率服务（0x180D），兼容多品牌 |
 
 ### 4.2 模块结构
 
@@ -116,7 +115,6 @@ com.drunkcat.barrier/
 | FREQUENT_APP_SWITCH | 25 | 10 分钟内切换 ≥15 次 |
 | HIGH_RISK_APP | 20 | 打开通讯录/短信/社交/支付类应用 |
 | DEVICE_SHAKING | 15 | 加速度计检测持续晃动 |
-| HEART_RATE_ANOMALY | 12 | 手环心率持续偏高（弱信号，需连续 5 次超基线 30%） |
 | TYPING_ANOMALY | 10 | 打字删除率异常（仅统计数量，不读内容） |
 | SUDDEN_ACTIVITY | 10 | 长时间无操作后突然活跃 |
 
@@ -371,7 +369,7 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 **核心机制**
 - [x] Device Owner 激活与锁定
 - [x] 无障碍降级拦截
-- [x] 风险评分引擎（6 信号：深夜/切换/高风险App/晃动/心率/突然活跃）
+- [x] 风险评分引擎（6 信号：深夜/切换/高风险App/晃动/打字异常/突然活跃）
 - [x] 自动监测 + 30 秒预警 + 自动上锁
 - [x] 自动保护总开关（用户可关闭）
 - [x] 「今晚不喝」暂停开关
@@ -389,11 +387,6 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 - [x] LockTask 白名单（永久白名单 + 用户自定义）
 - [x] 默认锁定清单（自动触发时套用）
 - [x] 停止保护需 PIN 验证（防醉酒绕过）
-
-**可穿戴设备**
-- [x] 标准 BLE 心率监测（兼容小米/华为/Amazfit/佳明等）
-- [x] 心率异常分析（纯逻辑，可测）
-- [x] WearableProvider 抽象接口（预留 Gadgetbridge/小米健康）
 
 **数据与复盘**
 - [x] 轨迹记录 + 逆地理编码（系统 Geocoder）
@@ -428,7 +421,6 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 | LockLock | 无障碍锁定 + Device Admin 防卸载 |
 | AppLock (Device Owner) | Device Owner 真锁定 |
 | OwnDroid | Device Owner 权限管理 |
-| Gadgetbridge | 开源手环数据管理，本项目的桥接数据源 |
 
 
 ## 十六、许可证
