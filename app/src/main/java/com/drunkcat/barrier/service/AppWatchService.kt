@@ -1,11 +1,14 @@
 package com.drunkcat.barrier.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import com.drunkcat.barrier.data.Prefs
 import com.drunkcat.barrier.risk.RiskMonitor
+import com.drunkcat.barrier.risk.RiskScorer
 import com.drunkcat.barrier.risk.ShakeDetector
+import com.drunkcat.barrier.risk.StaticDetector
 import com.drunkcat.barrier.risk.TypingAnalyzer
 import com.drunkcat.barrier.ui.LockOverlay
 import kotlinx.coroutines.CoroutineScope
@@ -32,7 +35,12 @@ class AppWatchService : AccessibilityService() {
     private lateinit var prefs: Prefs
 
     private var shakeDetector: ShakeDetector? = null
+    private var staticDetector: StaticDetector? = null
     private val typingAnalyzer = TypingAnalyzer()
+
+    // 当前前台应用及其进入前台的时间（用于「长时间前台」判定）
+    @Volatile private var foregroundPkg: String? = null
+    @Volatile private var foregroundSince: Long = 0L
 
     private var lockedPackages: Set<String> = emptySet()
     private var whitelistPackages: Set<String> = emptySet()
@@ -58,6 +66,9 @@ class AppWatchService : AccessibilityService() {
 
     // 上次触发自动保护的时间，防止重复触发
     @Volatile private var lastAutoTriggerAt: Long = 0L
+
+    /** 静置前台判定所需的最短持续前台时长（5 分钟） */
+    private val STATIC_FOREGROUND_MIN_MS = 5 * 60_000L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -88,12 +99,21 @@ class AppWatchService : AccessibilityService() {
         }
         // 启动步态检测
         shakeDetector = ShakeDetector(this).also { it.start() }
+        // 启动静置检测（支架/躺卧刷视频场景）
+        staticDetector = StaticDetector(this).also { it.start() }
         // 定期刷新时间信号并检查风险
         scope.launch {
             while (true) {
                 delay(60_000)
                 RiskMonitor.refreshTimeSignal()
                 maybeAutoTrigger()
+            }
+        }
+        // 定期检测「静置 + 长时间同一 App 前台」场景（深夜）
+        scope.launch {
+            while (true) {
+                delay(60_000)
+                checkStaticForeground()
             }
         }
     }
@@ -128,8 +148,24 @@ class AppWatchService : AccessibilityService() {
         if (pkg == packageName) return
         if (pkg == "com.android.systemui") return
 
+        // 记录当前前台应用与进入时间（用于长按前台判定）
+        val now = System.currentTimeMillis()
+        if (pkg != foregroundPkg) {
+            foregroundPkg = pkg
+            foregroundSince = now
+        }
+
         // ---- 1. 持续上报信号（无论保护是否开启）----
         RiskMonitor.onAppSwitched(pkg)
+        // 深夜打开短视频（抖音/快手/视频号等）：单条即达阈值，立即进入预警
+        if (RiskScorer.isLateNight(java.util.Calendar.getInstance()
+                .apply { timeInMillis = now }.get(java.util.Calendar.HOUR_OF_DAY))
+            && RiskScorer.isShortVideoPackage(pkg)
+        ) {
+            android.util.Log.d("DrunkCat", "watch: SHORT_VIDEO_NIGHT $pkg")
+            RiskMonitor.onShortVideoLateNight(now)
+            maybeAutoTrigger()
+        }
         maybeAutoTrigger()
 
         android.util.Log.d(
@@ -148,8 +184,7 @@ class AppWatchService : AccessibilityService() {
         // 白名单应用允许自由使用
         if (pkg in whitelistPackages) return
 
-        val now = System.currentTimeMillis()
-        // 全局放行期内直接通过
+        // 全局放行期内直接通过（now 已在上方声明）
         if (now < globalAllowUntil) return
         if (pkg == tempAllowedPackage && now < tempAllowUntil) return
         // 紧急呼叫后的临时放行窗口
@@ -241,11 +276,33 @@ class AppWatchService : AccessibilityService() {
         }
     }
 
+    /**
+     * 检测「手机静置 + 同一 App 长时间前台 + 深夜 + 屏幕亮」场景。
+     *
+     * 对应把手机架在支架上、躺着刷视频/语音的场景：用户不切屏、不打字，
+     * 传统信号几乎为零。此时若已持续前台 ≥ [STATIC_FOREGROUND_MIN_MS] 且深夜，
+     * 视为弱风险信号上报，叠加其他信号即可触发保护。
+     */
+    private fun checkStaticForeground() {
+        val now = System.currentTimeMillis()
+        val pkg = foregroundPkg ?: return
+        if (now - foregroundSince < STATIC_FOREGROUND_MIN_MS) return
+        // 仅深夜判定
+        val hour = java.util.Calendar.getInstance()
+            .apply { timeInMillis = now }.get(java.util.Calendar.HOUR_OF_DAY)
+        if (!RiskScorer.isLateNight(hour)) return
+        // 屏幕需为亮屏（灭屏不视为使用中）
+        val pm = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager ?: return
+        if (!pm.isInteractive) return
+        RiskMonitor.onStaticForeground("静置前台 $pkg 超 ${STATIC_FOREGROUND_MIN_MS / 60000} 分钟")
+    }
+
     override fun onInterrupt() { }
 
     override fun onDestroy() {
         super.onDestroy()
         shakeDetector?.stop()
+        staticDetector?.stop()
         scope.cancel()
     }
 

@@ -115,6 +115,8 @@ com.drunkcat.barrier/
 | FREQUENT_APP_SWITCH | 25 | 10 分钟内切换 ≥15 次 |
 | HIGH_RISK_APP | 20 | 打开通讯录/短信/社交/支付类应用 |
 | DEVICE_SHAKING | 15 | 加速度计检测持续晃动 |
+| SHORT_VIDEO_NIGHT | 60 | 深夜刷短视频（抖音/快手/视频号/TikTok/B站），单条即触发，应对「支架刷视频+语音」漏判 |
+| STATIC_FOREGROUND | 15 | 手机静置 + 同一 App 长时间前台（支架看视频特征） |
 | TYPING_ANOMALY | 10 | 打字删除率异常（仅统计数量，不读内容） |
 | SUDDEN_ACTIVITY | 10 | 长时间无操作后突然活跃 |
 
@@ -369,7 +371,7 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 **核心机制**
 - [x] Device Owner 激活与锁定
 - [x] 无障碍降级拦截
-- [x] 风险评分引擎（6 信号：深夜/切换/高风险App/晃动/打字异常/突然活跃）
+- [x] 风险评分引擎（8 信号：深夜/切换/高风险App/晃动/深夜短视频/静置前台/打字异常/突然活跃）
 - [x] 自动监测 + 30 秒预警 + 自动上锁
 - [x] 自动保护总开关（用户可关闭）
 - [x] 「今晚不喝」暂停开关

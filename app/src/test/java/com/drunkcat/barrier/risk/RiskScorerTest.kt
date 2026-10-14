@@ -106,4 +106,22 @@ class RiskScorerTest {
         assertFalse(RiskScorer.isHighRiskPackage("com.android.chrome"))
         assertFalse(RiskScorer.isHighRiskPackage("com.google.android.apps.maps"))
     }
+
+    @Test
+    fun `short video package detection`() {
+        assertTrue(RiskScorer.isShortVideoPackage("com.ss.android.ugc.aweme"))   // 抖音
+        assertTrue(RiskScorer.isShortVideoPackage("com.ss.android.ugc.aweme.lite"))
+        assertTrue(RiskScorer.isShortVideoPackage("com.kuaishou.nebula"))         // 快手
+        assertTrue(RiskScorer.isShortVideoPackage("tv.danmaku.bili"))            // B站
+        assertFalse(RiskScorer.isShortVideoPackage("com.tencent.mm"))            // 微信主包不是短视频包
+        assertFalse(RiskScorer.isShortVideoPackage("com.android.chrome"))
+    }
+
+    @Test
+    fun `short video night alone triggers threshold`() {
+        // 深夜刷短视频单条信号权重=60，应直接达阈值触发
+        RiskMonitor.reset()
+        RiskMonitor.onShortVideoLateNight(now)
+        assertTrue(RiskScorer.shouldTrigger(RiskMonitor.snapshot(), now))
+    }
 }

@@ -25,7 +25,19 @@ enum class RiskSignal(val weight: Int, val label: String) {
     SUDDEN_ACTIVITY(10, "突然活跃"),
 
     /** 打字行为异常（删除率高，弱信号，仅统计不读内容） */
-    TYPING_ANOMALY(10, "打字异常")
+    TYPING_ANOMALY(10, "打字异常"),
+
+    /**
+     * 深夜刷短视频（抖音/快手/视频号/TikTok 等）。
+     * 权重直接等于阈值：深夜打开即触发预警，是最易漏的「支架刷视频+语音」场景。
+     */
+    SHORT_VIDEO_NIGHT(60, "深夜刷短视频"),
+
+    /**
+     * 手机静置 + 长时间同一 App 前台（支架看视频特征）。
+     * 弱信号，仅辅助：深夜叠加其他信号即可触发保护。
+     */
+    STATIC_FOREGROUND(15, "手机静置长时间前台")
 }
 
 /**

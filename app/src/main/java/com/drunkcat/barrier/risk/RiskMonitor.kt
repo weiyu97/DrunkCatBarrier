@@ -75,6 +75,26 @@ object RiskMonitor {
     }
 
     /**
+     * 深夜打开短视频应用（抖音/快手/视频号/TikTok 等）。
+     * 单条权重即达阈值，用于「支架刷视频 + 语音」这类无切屏、无打字的漏判场景。
+     */
+    fun onShortVideoLateNight(now: Long = System.currentTimeMillis()) {
+        synchronized(lock) {
+            addHit(RiskSignal.SHORT_VIDEO_NIGHT, now, "深夜刷短视频")
+        }
+    }
+
+    /**
+     * 手机静置且同一 App 长时间前台（支架看视频特征）。
+     * 弱信号，仅辅助评分。
+     */
+    fun onStaticForeground(detail: String, now: Long = System.currentTimeMillis()) {
+        synchronized(lock) {
+            addHit(RiskSignal.STATIC_FOREGROUND, now, detail)
+        }
+    }
+
+    /**
      * 获取当前风险分。
      */
     fun currentScore(now: Long = System.currentTimeMillis()): Int {

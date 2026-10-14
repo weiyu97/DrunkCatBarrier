@@ -63,4 +63,24 @@ object RiskScorer {
         val lower = packageName.lowercase()
         return keywords.any { lower.contains(it) }
     }
+
+    /**
+     * 判断包名是否为短视频应用（抖音/快手/视频号/TikTok 等）。
+     *
+     * 短视频是「支架刷视频 + 语音」漏判场景的核心：用户长时间静置观看、
+     * 不切屏也不打字，传统信号几乎为零。深夜打开时视为强风险。
+     */
+    fun isShortVideoPackage(packageName: String): Boolean {
+        val keywords = listOf(
+            "aweme",                    // 抖音（包名 com.ss.android.ugc.aweme）
+            "douyin", "tiktok",         // 抖音国际版 / TikTok
+            "kuaishou", "kwai",         // 快手
+            "weishi",                   // 微视
+            "bili",                    // B站（tv.danmaku.bili）
+            "v.qq", "qqlive", "qiyi",   // 腾讯视频 / 爱奇艺等
+            "ixigua", "huoshan"         // 西瓜视频 / 火山小视频
+        )
+        val lower = packageName.lowercase()
+        return keywords.any { lower.contains(it) }
+    }
 }
