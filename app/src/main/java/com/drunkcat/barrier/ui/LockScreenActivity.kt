@@ -99,8 +99,10 @@ class LockScreenActivity : ComponentActivity() {
                 LockScreenContent(
                     attemptedPackage = attempted,
                     onUnlock = {
-                        // 验证通过：撤掉可能存在的悬浮锁屏层，再关闭 Activity
+                        // 验证通过：取消预警（避免 30 秒后误开启整晚保护），
+                        // 撤掉悬浮锁屏层，再关闭 Activity
                         unlocked = true
+                        AppWatchService.cancelWarning()
                         AppWatchService.dismissOverlay()
                         finish()
                     },

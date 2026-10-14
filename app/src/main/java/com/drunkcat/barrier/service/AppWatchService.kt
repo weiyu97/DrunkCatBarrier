@@ -176,18 +176,18 @@ class AppWatchService : AccessibilityService() {
 
         // ---- 1. 持续上报信号（无论保护是否开启）----
         RiskMonitor.onAppSwitched(pkg)
-        // 短视频拦截：深夜 或 用户开启了「全天封印」时，打开抖音/快手等即触发。
-        // 单条权重即达阈值，立即进入预警。
+        // 硬触发拦截：深夜 或 用户开启了「全天封印」时，打开短视频 / 支付银行类即触发。
+        // 这类 App 是「破财/社死」的核心入口，单条权重即达阈值，立即进入预警并半锁。
         val hour = java.util.Calendar.getInstance()
             .apply { timeInMillis = now }.get(java.util.Calendar.HOUR_OF_DAY)
-        val shortVideoTrigger = RiskScorer.isShortVideoPackage(pkg) &&
+        val hardTrigger = (RiskScorer.isShortVideoPackage(pkg) || RiskScorer.isPaymentPackage(pkg)) &&
             (RiskScorer.isLateNight(hour) || shortVideoLockEnabled)
-        if (shortVideoTrigger) {
-            android.util.Log.d("DrunkCat", "watch: SHORT_VIDEO trigger $pkg (night=${RiskScorer.isLateNight(hour)} lock=$shortVideoLockEnabled)")
+        if (hardTrigger) {
+            android.util.Log.d("DrunkCat", "watch: HARD trigger $pkg (night=${RiskScorer.isLateNight(hour)} lock=$shortVideoLockEnabled)")
             RiskMonitor.onShortVideoLateNight(now)
-            maybeAutoTrigger()
+            maybeAutoTrigger(pkg)
         }
-        maybeAutoTrigger()
+        maybeAutoTrigger(pkg)
 
         android.util.Log.d(
             "DrunkCat",
@@ -198,8 +198,8 @@ class AppWatchService : AccessibilityService() {
         // 结界守护：保护开启后，只要前台不是本应用（且非白名单/临时放行），
         // 就把软锁屏拉回前台，把用户锁在结界内。
         if (!protectionActive) {
-            // 保护已关闭，确保残留的悬浮锁屏层被撤掉
-            if (LockOverlay.isShowing()) LockOverlay.remove(this)
+            // 保护已关闭：预警中（半锁）需保留锁屏层，不在此移除
+            if (LockOverlay.isShowing() && !WarningState.active) LockOverlay.remove(this)
             return
         }
         // 白名单应用允许自由使用
@@ -231,7 +231,7 @@ class AppWatchService : AccessibilityService() {
      *
      * 阈值由 ProtectionLevel 三档决定（LITE=99, STANDARD=60, STRICT=40）。
      */
-    private fun maybeAutoTrigger() {
+    private fun maybeAutoTrigger(pkg: String = "") {
         if (!autoProtectEnabled) return
         if (protectionActive) return
         if (WarningState.active) return
@@ -254,8 +254,10 @@ class AppWatchService : AccessibilityService() {
             // 进入预警状态
             WarningState.start(now)
             WarningState.onCancel = {
-                // 用户表示清醒：清空风险信号
+                // 用户表示清醒：清空风险信号并撤掉半锁层
                 RiskMonitor.reset()
+                LockOverlay.remove(this@AppWatchService)
+                LockOverlay.clearPending()
             }
             WarningState.onTimeout = {
                 scope.launch {
@@ -280,6 +282,12 @@ class AppWatchService : AccessibilityService() {
                     AutoProtectionNotifier.notify(this@AppWatchService, defaultAppliedCount)
                 }
             }
+
+            // 预警即半锁：立刻对当前前台应用拉起锁屏层，
+            // 用户必须过清醒验证才能继续，堵住「看到预警但钱已付」的窗口。
+            // 30 秒无操作则 onTimeout 正式开启整晚保护。
+            LockOverlay.show(this@AppWatchService, foregroundPkg ?: pkg, 0L)
+            android.util.Log.d("DrunkCat", "watch: HARD-LOCK overlay shown for ${foregroundPkg ?: pkg}")
 
             // 弹预警通知
             RiskWarningNotifier.notify(this@AppWatchService)
@@ -391,6 +399,17 @@ class AppWatchService : AccessibilityService() {
                 if (globalMs > 0L) {
                     it.globalAllowUntil = now + globalMs
                 }
+            }
+        }
+
+        /**
+         * 取消当前预警（用户清醒验证通过后调用），避免 30 秒后误开启整晚保护。
+         */
+        fun cancelWarning() {
+            if (WarningState.active) {
+                WarningState.cancel()
+                LockOverlay.remove(instance ?: return)
+                LockOverlay.clearPending()
             }
         }
 

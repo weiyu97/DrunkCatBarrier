@@ -118,6 +118,16 @@ class RiskScorerTest {
     }
 
     @Test
+    fun `payment package detection`() {
+        assertTrue(RiskScorer.isPaymentPackage("com.eg.android.AlipayGphone"))    // 支付宝
+        assertTrue(RiskScorer.isPaymentPackage("com.tencent.mm"))                 // 微信（含支付）
+        assertTrue(RiskScorer.isPaymentPackage("com.icbc.android"))               // 工行
+        assertTrue(RiskScorer.isPaymentPackage("com.unionpay.tsmservice"))       // 银联
+        assertFalse(RiskScorer.isPaymentPackage("com.android.chrome"))
+        assertFalse(RiskScorer.isPaymentPackage("com.ss.android.ugc.aweme"))      // 抖音不是支付类
+    }
+
+    @Test
     fun `short video night alone triggers threshold`() {
         // 深夜刷短视频单条信号权重=60，应直接达阈值触发
         RiskMonitor.reset()

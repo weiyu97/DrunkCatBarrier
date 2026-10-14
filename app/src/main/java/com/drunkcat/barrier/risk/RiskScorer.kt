@@ -83,4 +83,21 @@ object RiskScorer {
         val lower = packageName.lowercase()
         return keywords.any { lower.contains(it) }
     }
+
+    /**
+     * 判断包名是否为支付/银行类应用（支付宝/微信支付/银联/各银行 App）。
+     *
+     * 防破财核心：深夜或已开启短视频封印时，打开此类应用即与短视频同样立即触发硬锁。
+     */
+    fun isPaymentPackage(packageName: String): Boolean {
+        val keywords = listOf(
+            "alipay", "wallet", "unionpay",      // 支付宝 / 钱包 / 银联
+            "tencent.mm", "tenpay",              // 微信（含支付）/ 微信支付底层
+            "icbc", "ccb", "abchina", "boc",     // 工行 / 建行 / 农行 / 中行
+            "cmb", "cmbc", "ceb", "spdb",        // 招行 / 民生 / 光大 / 浦发
+            "bank", "pay"                        // 各类银行 / 支付
+        )
+        val lower = packageName.lowercase()
+        return keywords.any { lower.contains(it) }
+    }
 }
