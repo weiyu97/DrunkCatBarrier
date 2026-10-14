@@ -367,6 +367,7 @@ private fun AppRoot(
     var protectionLevel by remember { mutableStateOf("STANDARD") }
     var autoProtectEnabled by remember { mutableStateOf(true) }
     var autoSkipped by remember { mutableStateOf(false) }
+    var shortVideoLock by remember { mutableStateOf(false) }
     var onboardingDone by remember { mutableStateOf<Boolean?>(null) }
     var onboardingStep by remember { mutableIntStateOf(0) }
     var endHour by remember { mutableIntStateOf(com.drunkcat.barrier.data.ContractTime.DEFAULT_HOUR) }
@@ -391,6 +392,7 @@ private fun AppRoot(
             prefs.autoProtectFlow.first()
         } catch (e: Exception) { true }
         autoSkipped = try { prefs.isAutoSkipped() } catch (e: Exception) { false }
+        shortVideoLock = try { prefs.shortVideoLockFlow.first() } catch (e: Exception) { false }
         onboardingDone = try { prefs.isOnboardingDone() } catch (e: Exception) { true }
         // 首次启动时自动申请通知权限（用于预警）
         android.util.Log.d("DrunkCat", "onboardingDone=$onboardingDone")
@@ -403,6 +405,14 @@ private fun AppRoot(
     // 实际执行停止
     val doStop: () -> Unit = {
         scope.launch {
+            // 契约未到期：禁止手动关闭，防止醉酒手滑解除保护
+            val sealed = prefs.getContractSealed()
+            val until = prefs.getProtectionUntil()
+            if (sealed && until > 0L && System.currentTimeMillis() < until) {
+                onToast("契约未到期，无法手动停止（请到到期时间或先解除契约）")
+                return@launch
+            }
+            prefs.setContractSealed(false)
             prefs.setProtectionActive(false)
             protectionActive = false
             com.drunkcat.barrier.service.AppWatchService.dismissOverlay()
@@ -567,6 +577,13 @@ private fun AppRoot(
                     onLevelChange = { newLevel ->
                         protectionLevel = newLevel
                         scope.launch { prefs.setProtectionLevel(newLevel) }
+                    },
+                    shortVideoLock = shortVideoLock,
+                    onToggleShortVideoLock = {
+                        val next = !shortVideoLock
+                        shortVideoLock = next
+                        scope.launch { prefs.setShortVideoLock(next) }
+                        onToast(if (next) "短视频全天封印已开启" else "短视频全天封印已关闭")
                     }
                 )
             } else {
@@ -591,7 +608,14 @@ private fun AppRoot(
                     onSetPin = { screen = Screen.PIN_SET },
                     onStartContract = startContract,
                     onTestVerify = { screen = Screen.VERIFICATION },
-                    onStopProtection = stopProtection
+                    onStopProtection = stopProtection,
+                    shortVideoLock = shortVideoLock,
+                    onToggleShortVideoLock = {
+                        val next = !shortVideoLock
+                        shortVideoLock = next
+                        scope.launch { prefs.setShortVideoLock(next) }
+                        onToast(if (next) "短视频全天封印已开启" else "短视频全天封印已关闭")
+                    }
                 )
             }
         }
@@ -725,6 +749,8 @@ private fun AppRoot(
                             // 开启保护开关，AppWatchService 据此拦截
                             prefs.setProtectionActive(true)
                             protectionActive = true
+                            // 契约缔结：到期前禁止手动关闭
+                            prefs.setContractSealed(true)
                             // 设置到期时间
                             prefs.setProtectionUntil(
                                 com.drunkcat.barrier.data.ContractTime.nextAt(chosenHour)
@@ -756,6 +782,7 @@ private fun AppRoot(
                             prefs.setContractMode(contractMode.name)
                             prefs.setProtectionActive(true)
                             protectionActive = true
+                            prefs.setContractSealed(true)
                             prefs.setProtectionUntil(
                                 com.drunkcat.barrier.data.ContractTime.nextAt(endHour)
                             )
@@ -934,7 +961,9 @@ private fun HomeScreen(
     onSetPin: () -> Unit,
     onStartContract: () -> Unit,
     onTestVerify: () -> Unit,
-    onStopProtection: () -> Unit
+    onStopProtection: () -> Unit,
+    shortVideoLock: Boolean,
+    onToggleShortVideoLock: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -1025,6 +1054,9 @@ private fun HomeScreen(
         }
         Button(onClick = onSetPin, modifier = Modifier.fillMaxWidth()) {
             Text(if (hasPin) "修改 PIN" else "设置 PIN")
+        }
+        Button(onClick = onToggleShortVideoLock, modifier = Modifier.fillMaxWidth()) {
+            Text(if (shortVideoLock) "短视频全天封印：已开启" else "短视频全天封印：关闭")
         }
 
         Text("运行", style = MaterialTheme.typography.titleSmall)

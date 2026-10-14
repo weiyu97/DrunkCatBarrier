@@ -1,9 +1,16 @@
 package com.drunkcat.barrier.service
 
 import android.accessibilityservice.AccessibilityService
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.view.accessibility.AccessibilityEvent
+import androidx.core.app.NotificationCompat
+import com.drunkcat.barrier.MainActivity
+import com.drunkcat.barrier.R
 import com.drunkcat.barrier.data.Prefs
 import com.drunkcat.barrier.risk.RiskMonitor
 import com.drunkcat.barrier.risk.RiskScorer
@@ -67,8 +74,15 @@ class AppWatchService : AccessibilityService() {
     // 上次触发自动保护的时间，防止重复触发
     @Volatile private var lastAutoTriggerAt: Long = 0L
 
+    /** 短视频全天封印开关（订阅自 Prefs） */
+    @Volatile private var shortVideoLockEnabled = false
+
     /** 静置前台判定所需的最短持续前台时长（5 分钟） */
     private val STATIC_FOREGROUND_MIN_MS = 5 * 60_000L
+
+    /** 监测常驻通知 */
+    private val WATCH_CHANNEL_ID = "drunkcat_watch"
+    private val WATCH_NOTIFICATION_ID = 2001
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -89,6 +103,11 @@ class AppWatchService : AccessibilityService() {
         scope.launch {
             prefs.autoProtectFlow.collect { autoProtectEnabled = it }
         }
+        scope.launch {
+            prefs.shortVideoLockFlow.collect { shortVideoLockEnabled = it }
+        }
+        // 启动监测常驻通知（前台化，避免被系统回收导致漏检）
+        startWatchForeground()
         // 定期刷新冷却时间与暂停状态
         scope.launch {
             while (true) {
@@ -157,12 +176,14 @@ class AppWatchService : AccessibilityService() {
 
         // ---- 1. 持续上报信号（无论保护是否开启）----
         RiskMonitor.onAppSwitched(pkg)
-        // 深夜打开短视频（抖音/快手/视频号等）：单条即达阈值，立即进入预警
-        if (RiskScorer.isLateNight(java.util.Calendar.getInstance()
-                .apply { timeInMillis = now }.get(java.util.Calendar.HOUR_OF_DAY))
-            && RiskScorer.isShortVideoPackage(pkg)
-        ) {
-            android.util.Log.d("DrunkCat", "watch: SHORT_VIDEO_NIGHT $pkg")
+        // 短视频拦截：深夜 或 用户开启了「全天封印」时，打开抖音/快手等即触发。
+        // 单条权重即达阈值，立即进入预警。
+        val hour = java.util.Calendar.getInstance()
+            .apply { timeInMillis = now }.get(java.util.Calendar.HOUR_OF_DAY)
+        val shortVideoTrigger = RiskScorer.isShortVideoPackage(pkg) &&
+            (RiskScorer.isLateNight(hour) || shortVideoLockEnabled)
+        if (shortVideoTrigger) {
+            android.util.Log.d("DrunkCat", "watch: SHORT_VIDEO trigger $pkg (night=${RiskScorer.isLateNight(hour)} lock=$shortVideoLockEnabled)")
             RiskMonitor.onShortVideoLateNight(now)
             maybeAutoTrigger()
         }
@@ -303,7 +324,54 @@ class AppWatchService : AccessibilityService() {
         super.onDestroy()
         shakeDetector?.stop()
         staticDetector?.stop()
+        stopWatchForeground()
         scope.cancel()
+    }
+
+    // ---------- 监测常驻通知（前台化） ----------
+
+    private fun startWatchForeground() {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val ch = NotificationChannel(
+                WATCH_CHANNEL_ID,
+                "醉猫结界监测",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "后台行为监测常驻，防止被系统回收"
+                setShowBadge(false)
+            }
+            nm.createNotificationChannel(ch)
+        }
+        startForeground(WATCH_NOTIFICATION_ID, buildWatchNotification())
+    }
+
+    private fun stopWatchForeground() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
+    }
+
+    private fun buildWatchNotification(): android.app.Notification {
+        val pi = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val tip = if (shortVideoLockEnabled) "短视频全天封印已开启" else "深夜短视频拦截已开启"
+        return NotificationCompat.Builder(this, WATCH_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("醉猫结界监测中")
+            .setContentText(tip)
+            .setContentIntent(pi)
+            .setOngoing(true)
+            .setShowWhen(false)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
     }
 
     companion object {

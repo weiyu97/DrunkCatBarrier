@@ -33,6 +33,8 @@ class Prefs(private val context: Context) {
         val MAP_ENABLED = booleanPreferencesKey("map_enabled")
         val FAILURE_COUNT = intPreferencesKey("failure_count")
         val COOLDOWN_UNTIL = longPreferencesKey("cooldown_until")
+        val SHORT_VIDEO_LOCK = booleanPreferencesKey("short_video_lock")
+        val CONTRACT_SEALED = booleanPreferencesKey("contract_sealed")
     }
 
     // ---------- PIN ----------
@@ -195,6 +197,27 @@ class Prefs(private val context: Context) {
             it[Keys.COOLDOWN_UNTIL] = 0L
         }
     }
+
+    // ---------- 短视频全天封印开关（默认关闭：仅默认深夜拦截） ----------
+
+    suspend fun setShortVideoLock(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.SHORT_VIDEO_LOCK] = enabled }
+    }
+
+    val shortVideoLockFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.SHORT_VIDEO_LOCK] ?: false }
+
+    // ---------- 契约锁定（契约开启且未到期时禁止手动停止） ----------
+
+    suspend fun setContractSealed(sealed: Boolean) {
+        context.dataStore.edit { it[Keys.CONTRACT_SEALED] = sealed }
+    }
+
+    val contractSealedFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[Keys.CONTRACT_SEALED] ?: false }
+
+    suspend fun getContractSealed(): Boolean =
+        context.dataStore.data.first()[Keys.CONTRACT_SEALED] ?: false
 }
 
 enum class ContractMode { QUICK, FULL }

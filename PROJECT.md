@@ -117,6 +117,7 @@ com.drunkcat.barrier/
 | DEVICE_SHAKING | 15 | 加速度计检测持续晃动 |
 | SHORT_VIDEO_NIGHT | 60 | 深夜刷短视频（抖音/快手/视频号/TikTok/B站），单条即触发，应对「支架刷视频+语音」漏判 |
 | STATIC_FOREGROUND | 15 | 手机静置 + 同一 App 长时间前台（支架看视频特征） |
+| SHORT_VIDEO_LOCK（设置项） | - | 短视频全天封印开关：开启后任何时段打开短视频即触发 SHORT_VIDEO_NIGHT |
 | TYPING_ANOMALY | 10 | 打字删除率异常（仅统计数量，不读内容） |
 | SUDDEN_ACTIVITY | 10 | 长时间无操作后突然活跃 |
 
@@ -389,6 +390,9 @@ adb shell dpm set-device-owner com.drunkcat.barrier/.admin.DrunkCatAdminReceiver
 - [x] LockTask 白名单（永久白名单 + 用户自定义）
 - [x] 默认锁定清单（自动触发时套用）
 - [x] 停止保护需 PIN 验证（防醉酒绕过）
+- [x] 契约锁定：契约到期前禁止手动停止（防醉酒手滑解除）
+- [x] 短视频全天封印开关（设置内可开启，任何时段打开短视频即验证）
+- [x] 无障碍监测服务前台常驻化（降低被系统回收导致漏检）
 
 **数据与复盘**
 - [x] 轨迹记录 + 逆地理编码（系统 Geocoder）

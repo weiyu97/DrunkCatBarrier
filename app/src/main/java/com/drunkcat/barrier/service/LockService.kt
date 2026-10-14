@@ -76,6 +76,7 @@ class LockService : Service() {
         // 到期：解除保护
         prefs.setProtectionActive(false)
         prefs.setProtectionUntil(0L)
+        prefs.setContractSealed(false)
         // 清空风险信号
         com.drunkcat.barrier.risk.RiskMonitor.reset()
         // 停止服务

@@ -86,7 +86,9 @@ fun GlassHomeScreen(
     onNavReview: () -> Unit,
     onOpenCheckup: () -> Unit,
     levelName: String,
-    onLevelChange: (String) -> Unit
+    onLevelChange: (String) -> Unit,
+    shortVideoLock: Boolean,
+    onToggleShortVideoLock: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -421,6 +423,18 @@ fun GlassHomeScreen(
                         onClick = onToggleSkipTonight
                     )
                     Spacer(Modifier.height(9.dp))
+                    GlassSecondaryButton(
+                        text = if (shortVideoLock) "短视频全天封印：已开启" else "短视频全天封印：关闭",
+                        onClick = onToggleShortVideoLock
+                    )
+                    Text(
+                        text = "开启后，任何时段打开抖音/快手/视频号/B站都需先过验证；不开启则仅深夜拦截。",
+                        fontSize = 10.5.sp,
+                        lineHeight = 16.sp,
+                        color = Glass.OnSurfaceVariant,
+                        fontFamily = FontFamily.Serif,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 9.dp)
+                    )
                     GlassSecondaryButton(
                         text = "封印名单（$lockedCount）",
                         onClick = onPickApps
