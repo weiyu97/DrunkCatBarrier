@@ -36,3 +36,6 @@ pkg.txt
 acts.txt
 wrapper.log
 _tmp_*.png
+
+# 临时提交说明文件
+commit_msg.txt
